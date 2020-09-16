@@ -1,6 +1,7 @@
 package science.atlarge.opencraft.dyconits
 
 import com.google.common.collect.Maps
+import org.slf4j.LoggerFactory
 import java.util.function.Consumer
 
 /**
@@ -13,12 +14,16 @@ import java.util.function.Consumer
 class Dyconit<SubKey, Message>(val name: String) {
     private var subscriptions: MutableMap<SubKey, Subscription<Message>> = Maps.newConcurrentMap()
 
+    private val logger = LoggerFactory.getLogger(javaClass)
+
     fun addSubscription(sub: SubKey, bounds: Bounds, callback: Consumer<Message>) {
         subscriptions.putIfAbsent(sub, Subscription(bounds, callback))
+        logger.trace("dyconit $name subscribers ${subscriptions.size}")
     }
 
     fun removeSubscription(sub: SubKey) {
         subscriptions.remove(sub)
+        logger.trace("dyconit $name subscribers ${subscriptions.size}")
     }
 
     fun addMessage(message: DMessage<Message>) {
@@ -33,5 +38,17 @@ class Dyconit<SubKey, Message>(val name: String) {
 
     fun getSubscribers(): List<SubKey> {
         return subscriptions.keys.toList()
+    }
+
+    fun countQueuedMessages(): Int {
+        return subscriptions.map { e -> e.value.countQueuedMessages() }.sum()
+    }
+
+    fun calculateNumericalError(): Int {
+        return subscriptions.map { e -> e.value.numericalError }.sum()
+    }
+
+    fun calculateStaleness(): Long {
+        return subscriptions.map { e -> e.value.staleness }.sum()
     }
 }
