@@ -18,6 +18,11 @@ data class DMessage<Message>(val message: Message, val weight: Int)
  */
 data class Bounds constructor(val staleness: Int, val numerical: Int) {
     var timestampLastReset: Instant = Instant.now()
+
+    companion object {
+        val ZERO = Bounds(0, 0)
+        val INFINITE = Bounds(-1, -1)
+    }
 }
 
 data class Counters(

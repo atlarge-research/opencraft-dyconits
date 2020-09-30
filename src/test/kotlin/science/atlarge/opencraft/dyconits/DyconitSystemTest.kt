@@ -80,7 +80,7 @@ internal class DyconitSystemTest {
     fun unsubscribe() {
         system?.subscribe(subscriberName, callback, bounds, dyconitName)
         system?.unsubscribe(subscriberName, dyconitName)
-        assertEquals(0, system?.getDyconits()?.toList()?.get(0)?.getSubscribers()?.size)
+        assertEquals(0, system?.countDyconits())
     }
 
     @Test

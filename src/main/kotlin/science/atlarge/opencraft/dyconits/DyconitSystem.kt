@@ -8,10 +8,15 @@ import java.util.function.Consumer
 import kotlin.concurrent.timer
 
 class DyconitSystem<SubKey, Message>(
-    var policy: DyconitPolicy<SubKey, Message>,
+    policy: DyconitPolicy<SubKey, Message>,
     val filter: Filter<SubKey, Message>,
     log: Boolean = false
 ) {
+    var policy = policy
+        set(value) {
+            clear()
+            field = value
+        }
     private val dyconits = HashMap<String, Dyconit<SubKey, Message>>()
     private val subs = HashMap<SubKey, MutableSet<Dyconit<SubKey, Message>>>()
     private val counters = Counters()
@@ -63,6 +68,10 @@ class DyconitSystem<SubKey, Message>(
         logger.trace("dyconit ${dyconit.name} subscribers ${dyconit.countSubscribers()}")
     }
 
+    fun unsubscribeAll(sub: SubKey) {
+        subs[sub]?.toList()?.forEach { d -> unsubscribe(sub, d) }
+    }
+
     fun unsubscribe(sub: SubKey, dyconitName: String) {
         val dyconit = dyconits[dyconitName]
         if (dyconit != null) {
@@ -73,6 +82,7 @@ class DyconitSystem<SubKey, Message>(
     fun unsubscribe(sub: SubKey, dyconit: Dyconit<SubKey, Message>) {
         dyconit.removeSubscription(sub)
         subs.getOrPut(sub, { HashSet() }).remove(dyconit)
+        dyconit.takeIf { it.countSubscribers() <= 0 }?.let { dyconits.remove(it.name) }
         logger.trace("dyconit ${dyconit.name} subscribers ${dyconit.countSubscribers()}")
     }
 
@@ -86,8 +96,7 @@ class DyconitSystem<SubKey, Message>(
 
     fun publish(publisher: Any, message: Message) {
         val name = policy.computeAffectedDyconit(publisher)
-        val dyconit = getDyconit(name)
-        publish(message, dyconit)
+        dyconits[name]?.let { publish(message, it) }
     }
 
     fun publish(message: Message, dyconit: Dyconit<SubKey, Message>) {
@@ -96,5 +105,12 @@ class DyconitSystem<SubKey, Message>(
 
     fun countDyconits(): Int {
         return dyconits.size
+    }
+
+    private fun clear() {
+        // TODO prevent concurrent modifications.
+        dyconits.forEach { (_, v) -> v.close() }
+        dyconits.clear()
+        subs.clear()
     }
 }

@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory
 import java.util.function.Consumer
 
 /**
- * A dyconit is similar to a _Topics_ in a Pub/Sub system,
+ * A dyconit is similar to a _Topic_ in a Pub/Sub system,
  * and is the core of the bounded-inconsistency communication system in Opencraft.
  *
  * Outgoing messages are sent to a dyconit, which lazily forwards them to subscribers (players)
@@ -22,14 +22,15 @@ class Dyconit<SubKey, Message>(val name: String) {
     }
 
     fun removeSubscription(sub: SubKey) {
+        // TODO this does not flush queued messages. Needed?
         subscriptions.remove(sub)
         logger.trace("dyconit $name subscribers ${subscriptions.size}")
     }
 
     fun addMessage(message: DMessage<Message>) {
         subscriptions.entries.parallelStream()
-            .map { e -> e.value }
-            .forEach { s -> s.addMessage(message) }
+            .map { it.value }
+            .forEach { it.addMessage(message) }
     }
 
     fun countSubscribers(): Int {
@@ -41,14 +42,19 @@ class Dyconit<SubKey, Message>(val name: String) {
     }
 
     fun countQueuedMessages(): Int {
-        return subscriptions.map { e -> e.value.countQueuedMessages() }.sum()
+        return subscriptions.map { it.value.countQueuedMessages() }.sum()
     }
 
     fun calculateNumericalError(): Int {
-        return subscriptions.map { e -> e.value.numericalError }.sum()
+        return subscriptions.map { it.value.numericalError }.sum()
     }
 
     fun calculateStaleness(): Long {
-        return subscriptions.map { e -> e.value.staleness }.sum()
+        return subscriptions.map { it.value.staleness }.sum()
+    }
+
+    fun close() {
+        // TODO prevent new subscriptions from being added
+        subscriptions.values.parallelStream().forEach { it.close() }
     }
 }

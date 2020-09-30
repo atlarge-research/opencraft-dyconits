@@ -1,5 +1,8 @@
 package science.atlarge.opencraft.dyconits
 
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
@@ -8,7 +11,6 @@ import java.util.function.Consumer
 
 class Subscription<Message>(var bounds: Bounds, var callback: Consumer<Message>) {
     private val messageQueue: MutableList<DMessage<Message>> = ArrayList()
-    private val timer = Timer()
     private var timerSet = false
     private val lock = Any()
     val staleness: Long
@@ -30,15 +32,16 @@ class Subscription<Message>(var bounds: Bounds, var callback: Consumer<Message>)
 
     private fun checkBounds() {
         val timeSinceLastFlush = staleness
-        if (timeSinceLastFlush >= bounds.staleness) {
+        if (bounds.staleness in 0..timeSinceLastFlush) {
             logger.trace("flush cause staleness $timeSinceLastFlush >= ${bounds.staleness}")
             flush()
-        } else if (numericalError > bounds.numerical) {
+        } else if (bounds.numerical in 0 until numericalError) {
             logger.trace("flush cause numerical $numericalError > ${bounds.numerical}")
             flush()
-        } else if (!timerSet) {
-            val delay = bounds.staleness - timeSinceLastFlush
-            timer.schedule(kotlin.concurrent.timerTask {
+        } else if (bounds.staleness >= 0 && !timerSet) {
+            val delayMS = bounds.staleness - timeSinceLastFlush
+            GlobalScope.launch {
+                delay(delayMS)
                 logger.trace(
                     "flush cause timer ${
                         Duration.between(
@@ -49,7 +52,7 @@ class Subscription<Message>(var bounds: Bounds, var callback: Consumer<Message>)
                 )
                 flush()
                 timerSet = false
-            }, delay)
+            }
             timerSet = true
         }
     }
@@ -64,5 +67,13 @@ class Subscription<Message>(var bounds: Bounds, var callback: Consumer<Message>)
 
     fun countQueuedMessages(): Int {
         return messageQueue.size
+    }
+
+    fun close() {
+        synchronized(lock) {
+            // TODO prevent policy resetting bounds
+            bounds = Bounds.ZERO
+            flush()
+        }
     }
 }
