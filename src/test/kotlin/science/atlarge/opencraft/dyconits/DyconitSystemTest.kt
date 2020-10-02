@@ -7,6 +7,7 @@ import science.atlarge.opencraft.dyconits.policies.DyconitCommand
 import science.atlarge.opencraft.dyconits.policies.DyconitPolicy
 import science.atlarge.opencraft.dyconits.policies.DyconitSubscribeCommand
 import science.atlarge.opencraft.messaging.Filter
+import java.io.File
 import java.util.function.Consumer
 import kotlin.test.assertEquals
 
@@ -79,7 +80,7 @@ internal class DyconitSystemTest {
     fun unsubscribe() {
         system?.subscribe(subscriberName, callback, bounds, dyconitName)
         system?.unsubscribe(subscriberName, dyconitName)
-        assertEquals(0, system?.getDyconits()?.toList()?.get(0)?.getSubscribers()?.size)
+        assertEquals(0, system?.countDyconits())
     }
 
     @Test
@@ -96,5 +97,14 @@ internal class DyconitSystemTest {
         system?.update(subscriber)
         system?.publish(Unit, msg)
         assertEquals(msg, sentMessages[0])
+    }
+
+    @Test
+    fun testLog() {
+        system = DyconitSystem(policy, filter, log = true)
+        Thread.sleep(2000)
+        assertEquals(true, system != null)
+        assertEquals(true, File(system!!.perfCounterLogger.logFilePath).isFile)
+        assertEquals(true, File(system!!.perfCounterLogger.logFilePath).delete())
     }
 }
