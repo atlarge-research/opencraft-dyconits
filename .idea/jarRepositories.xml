@@ -2,6 +2,11 @@
 <project version="4">
   <component name="RemoteRepositoriesConfiguration">
     <remote-repository>
+      <option name="id" value="opencraft-group" />
+      <option name="name" value="opencraft-group" />
+      <option name="url" value="https://opencraft-vm.labs.vu.nl/nexus/repository/opencraft-group/" />
+    </remote-repository>
+    <remote-repository>
       <option name="id" value="central" />
       <option name="name" value="Central Repository" />
       <option name="url" value="https://opencraft-vm.labs.vu.nl/nexus/repository/opencraft-group/" />

@@ -19,6 +19,30 @@
         <junit-jupiter.version>5.7.0</junit-jupiter.version>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>opencraft-group</id>
+            <url>https://opencraft-vm.labs.vu.nl/nexus/repository/opencraft-group/</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <distributionManagement>
+        <repository>
+            <id>opencraft-releases</id>
+            <url>https://opencraft-vm.labs.vu.nl/nexus/repository/opencraft-releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>opencraft-snapshots</id>
+            <url>https://opencraft-vm.labs.vu.nl/nexus/repository/opencraft-snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
+
     <dependencies>
         <!-- network utility -->
         <dependency>
