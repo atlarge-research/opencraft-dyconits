@@ -24,16 +24,3 @@ data class Bounds constructor(val staleness: Int, val numerical: Int) {
         val INFINITE = Bounds(-1, -1)
     }
 }
-
-data class Counters(
-    var dyconitsCreated: Int = 0,
-    var dyconitsRemoved: Int = 0,
-    var messagesQueued: Int = 0,
-    var messagesSent: Int = 0,
-    var numericalErrorQueued: Int = 0,
-    var numericalErrorSent: Int = 0,
-    var stalenessQueued: Long = 0,
-    var stalenessSent: Long = 0,
-    var numericalErrorBounds: List<Int> = ArrayList(),
-    var stalenessBounds: List<Long> = ArrayList(),
-)

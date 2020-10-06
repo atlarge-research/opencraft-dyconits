@@ -59,6 +59,14 @@ class Subscription<Message>(var bounds: Bounds, var callback: Consumer<Message>)
 
     private fun flush() {
         timerSet = false
+        val instance = PerformanceCounterLogger.instance
+        instance.messagesSent.addAndGet(messageQueue.size)
+        val sum = messageQueue.map { it.weight }.sum()
+        instance.numericalErrorSent.addAndGet(sum)
+        // FIXME get sub string
+        instance.removeNumericalError("", sum)
+        instance.removeStaleness("", bounds.timestampLastReset)
+
         bounds.timestampLastReset = Instant.now()
         messageQueue.forEach { m -> callback.accept(m.message) }
         messageQueue.clear()

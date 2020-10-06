@@ -13,6 +13,10 @@ import java.util.function.Consumer
  */
 class Dyconit<SubKey, Message>(val name: String) {
     private var subscriptions: MutableMap<SubKey, Subscription<Message>> = Maps.newConcurrentMap()
+    val staleness: Long
+        get() = subscriptions.values.map { it.staleness }.maxOrNull() ?: 0
+    val numericalError: Int
+        get() = subscriptions.values.map { it.numericalError }.maxOrNull() ?: 0
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -31,6 +35,12 @@ class Dyconit<SubKey, Message>(val name: String) {
         subscriptions.entries.parallelStream()
             .map { it.value }
             .forEach { it.addMessage(message) }
+        val count = subscriptions.entries.count()
+        val instance = PerformanceCounterLogger.instance
+        val error = count * message.weight
+        instance.messagesQueued.addAndGet(count)
+        instance.numericalErrorQueued.addAndGet(error)
+        instance.addNumericalError("", error)
     }
 
     fun countSubscribers(): Int {

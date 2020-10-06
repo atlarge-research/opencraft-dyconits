@@ -19,23 +19,23 @@ class DyconitSystem<SubKey, Message>(
         }
     private val dyconits = HashMap<String, Dyconit<SubKey, Message>>()
     private val subs = HashMap<SubKey, MutableSet<Dyconit<SubKey, Message>>>()
-    private val counters = Counters()
     val perfCounterLogger = PerformanceCounterLogger()
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
     init {
         if (log) {
-            timer("dyconit-system-timer", true, 0, 1000) { perfCounterLogger.log(counters) }
+            timer("dyconit-system-timer", true, 0, 1000) { perfCounterLogger.log() }
         }
     }
 
     fun update(sub: Subscriber<SubKey, Message>) {
         val commands = policy.update(sub)
-        commands.forEach { c -> c.execute(this) }
+        commands.forEach { it.execute(this) }
     }
 
     fun getDyconit(name: String): Dyconit<SubKey, Message> {
+        dyconits[name].takeIf { it == null }.run { perfCounterLogger.dyconitsCreated.incrementAndGet() }
         val dyconit = dyconits.getOrPut(name, { Dyconit(name) })
         logger.trace("dyconits total ${dyconits.size}")
         return dyconit
@@ -44,6 +44,7 @@ class DyconitSystem<SubKey, Message>(
     fun removeDyconit(name: String): Boolean {
         val deleted = dyconits.remove(name) != null
         logger.trace("dyconits total ${dyconits.size}")
+        deleted.takeIf { it }.run { perfCounterLogger.dyconitsRemoved.incrementAndGet() }
         return deleted
     }
 
