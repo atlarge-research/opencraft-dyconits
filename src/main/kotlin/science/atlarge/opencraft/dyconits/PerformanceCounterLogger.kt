@@ -65,11 +65,11 @@ class PerformanceCounterLogger(val logFilePath: String = "dyconits.log") {
             }
             numericalErrorAdded.clear()
             for (entry in numericalErrorRemoved) {
-                builder.appendLine("${entry.timestamp} numericalErrorAdded ${entry.sub} ${entry.error}")
+                builder.appendLine("${entry.timestamp} numericalErrorRemoved ${entry.sub} ${entry.error}")
             }
             numericalErrorRemoved.clear()
             for (entry in stalenessRemoved) {
-                builder.appendLine("${entry.timestamp} numericalErrorAdded ${entry.sub} ${entry.error}")
+                builder.appendLine("${entry.timestamp} stalenessRemoved ${entry.sub} ${entry.error}")
             }
             stalenessRemoved.clear()
         }
