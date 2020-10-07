@@ -12,12 +12,12 @@ import java.util.function.Consumer
  * while preventing large inconsistency.
  */
 class Dyconit<SubKey, Message>(val name: String) {
-    private var subscriptions: MutableMap<SubKey, Subscription<Message>> = Maps.newConcurrentMap()
+    private var subscriptions: MutableMap<SubKey, Subscription<SubKey, Message>> = Maps.newConcurrentMap()
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun addSubscription(sub: SubKey, bounds: Bounds, callback: Consumer<Message>) {
-        subscriptions.putIfAbsent(sub, Subscription(bounds, callback))
+        subscriptions.putIfAbsent(sub, Subscription(sub, bounds, callback))
         logger.trace("dyconit $name subscribers ${subscriptions.size}")
     }
 
@@ -31,6 +31,12 @@ class Dyconit<SubKey, Message>(val name: String) {
         subscriptions.entries.parallelStream()
             .map { it.value }
             .forEach { it.addMessage(message) }
+        val count = subscriptions.entries.count()
+        val instance = PerformanceCounterLogger.instance
+        val error = count * message.weight
+        instance.messagesQueued.addAndGet(count)
+        instance.numericalErrorQueued.addAndGet(error)
+        subscriptions.values.forEach { instance.addNumericalError(it.sub!!, message.weight) }
     }
 
     fun countSubscribers(): Int {
@@ -39,18 +45,6 @@ class Dyconit<SubKey, Message>(val name: String) {
 
     fun getSubscribers(): List<SubKey> {
         return subscriptions.keys.toList()
-    }
-
-    fun countQueuedMessages(): Int {
-        return subscriptions.map { it.value.countQueuedMessages() }.sum()
-    }
-
-    fun calculateNumericalError(): Int {
-        return subscriptions.map { it.value.numericalError }.sum()
-    }
-
-    fun calculateStaleness(): Long {
-        return subscriptions.map { it.value.staleness }.sum()
     }
 
     fun close() {
