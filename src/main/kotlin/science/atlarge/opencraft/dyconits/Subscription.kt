@@ -7,21 +7,29 @@ import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
 import java.util.*
+import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Consumer
+import kotlin.concurrent.withLock
 
-class Subscription<Message>(var bounds: Bounds, var callback: Consumer<Message>) {
+class Subscription<SubKey, Message>(val sub: SubKey, var bounds: Bounds, var callback: Consumer<Message>) {
     private val messageQueue: MutableList<DMessage<Message>> = ArrayList()
     private var timerSet = false
-    private val lock = Any()
-    val staleness: Long
-        get() = Duration.between(bounds.timestampLastReset, Instant.now()).toMillis()
+    private val lock = ReentrantLock()
+    val staleness: Duration
+        get() = Duration.between(bounds.timestampLastReset, Instant.now())
     var numericalError = 0
         private set
+    var firstMessageQueued: Instant = Instant.now()
+        private set
 
-    private val logger = LoggerFactory.getLogger(javaClass)
+    private
+    val logger = LoggerFactory.getLogger(javaClass)
 
     fun addMessage(msg: DMessage<Message>) {
-        synchronized(lock) {
+        lock.withLock {
+            if (messageQueue.isEmpty()) {
+                firstMessageQueued = Instant.now()
+            }
             messageQueue.add(msg)
             numericalError += msg.weight
             logger.trace("queue weight $numericalError")
@@ -32,14 +40,14 @@ class Subscription<Message>(var bounds: Bounds, var callback: Consumer<Message>)
 
     private fun checkBounds() {
         val timeSinceLastFlush = staleness
-        if (bounds.staleness in 0..timeSinceLastFlush) {
+        if (bounds.staleness in 0..timeSinceLastFlush.toMillis()) {
             logger.trace("flush cause staleness $timeSinceLastFlush >= ${bounds.staleness}")
             flush()
         } else if (bounds.numerical in 0 until numericalError) {
             logger.trace("flush cause numerical $numericalError > ${bounds.numerical}")
             flush()
         } else if (bounds.staleness >= 0 && !timerSet) {
-            val delayMS = bounds.staleness - timeSinceLastFlush
+            val delayMS = bounds.staleness - timeSinceLastFlush.toMillis()
             GlobalScope.launch {
                 delay(delayMS)
                 logger.trace(
@@ -60,25 +68,25 @@ class Subscription<Message>(var bounds: Bounds, var callback: Consumer<Message>)
     private fun flush() {
         timerSet = false
         val instance = PerformanceCounterLogger.instance
-        instance.messagesSent.addAndGet(messageQueue.size)
         val sum = messageQueue.map { it.weight }.sum()
-        instance.numericalErrorSent.addAndGet(sum)
-        // FIXME get sub string
-        instance.removeNumericalError("", sum)
-        instance.removeStaleness("", bounds.timestampLastReset)
+        val now = Instant.now()
 
-        bounds.timestampLastReset = Instant.now()
+        instance.messagesSent.addAndGet(messageQueue.size)
+        instance.numericalErrorSent.addAndGet(sum)
+        instance.removeNumericalError(sub!!, sum)
+        if (messageQueue.isNotEmpty()) {
+            instance.removeStaleness(sub, Duration.between(firstMessageQueued, now))
+        }
+
         messageQueue.forEach { m -> callback.accept(m.message) }
+
+        bounds.timestampLastReset = now
         messageQueue.clear()
         numericalError = 0
     }
 
-    fun countQueuedMessages(): Int {
-        return messageQueue.size
-    }
-
     fun close() {
-        synchronized(lock) {
+        lock.withLock {
             // TODO prevent policy resetting bounds
             bounds = Bounds.ZERO
             flush()

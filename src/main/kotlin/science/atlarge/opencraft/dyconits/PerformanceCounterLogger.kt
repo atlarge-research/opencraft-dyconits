@@ -1,13 +1,14 @@
 package science.atlarge.opencraft.dyconits
 
 import java.io.File
+import java.time.Duration
 import java.time.Instant
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class PerformanceCounterLogger(val logFilePath: String = "dyconits.log") {
+class PerformanceCounterLogger private constructor(val logFilePath: String = "dyconits.log") {
 
     var dyconitsCreated = AtomicInteger(0)
     var dyconitsRemoved = AtomicInteger(0)
@@ -15,9 +16,9 @@ class PerformanceCounterLogger(val logFilePath: String = "dyconits.log") {
     var messagesSent = AtomicInteger(0)
     var numericalErrorQueued = AtomicInteger(0)
     var numericalErrorSent = AtomicInteger(0)
-    private val numericalErrorAdded = LinkedList<NumericalErrorEntry>()
-    private val numericalErrorRemoved = LinkedList<NumericalErrorEntry>()
-    private val stalenessRemoved = LinkedList<StalenessEntry>()
+    private val numericalErrorAdded = HashMap<Any, Int>()
+    private val numericalErrorRemoved = HashMap<Any, Int>()
+    private val stalenessRemoved = HashMap<Any, Duration>()
     private val lock = ReentrantLock()
 
     private val file = File(logFilePath)
@@ -26,33 +27,31 @@ class PerformanceCounterLogger(val logFilePath: String = "dyconits.log") {
         val instance = PerformanceCounterLogger()
     }
 
-    data class NumericalErrorEntry(
-        val timestamp: Instant,
-        val sub: String,
-        val error: Int,
-    )
-
-    data class StalenessEntry(
-        val timestamp: Instant,
-        val sub: String,
-        val error: Instant,
-    )
-
-    fun addNumericalError(sub: String, error: Int) {
+    fun addNumericalError(sub: Any, error: Int) {
         lock.withLock {
-            numericalErrorAdded.add(NumericalErrorEntry(Instant.now(), sub, error))
+            when (val count = numericalErrorAdded[sub]) {
+                null -> numericalErrorAdded[sub] = error
+                else -> numericalErrorAdded[sub] = count + error
+            }
         }
     }
 
-    fun removeNumericalError(sub: String, error: Int) {
+    fun removeNumericalError(sub: Any, error: Int) {
         lock.withLock {
-            numericalErrorRemoved.add(NumericalErrorEntry(Instant.now(), sub, error))
+            when (val count = numericalErrorRemoved[sub]) {
+                null -> numericalErrorRemoved[sub] = error
+                else -> numericalErrorRemoved[sub] = count + error
+            }
         }
     }
 
-    fun removeStaleness(sub: String, lastReset: Instant) {
+    fun removeStaleness(sub: Any, delay: Duration) {
         lock.withLock {
-            stalenessRemoved.add(StalenessEntry(Instant.now(), sub, lastReset))
+            val prevDelay = stalenessRemoved[sub]
+            when {
+                prevDelay == null -> stalenessRemoved[sub] = delay
+                delay > prevDelay -> stalenessRemoved[sub] = delay
+            }
         }
     }
 
@@ -61,15 +60,15 @@ class PerformanceCounterLogger(val logFilePath: String = "dyconits.log") {
         val builder = StringBuilder()
         lock.withLock {
             for (entry in numericalErrorAdded) {
-                builder.appendLine("${entry.timestamp} numericalErrorAdded ${entry.sub} ${entry.error}")
+                builder.appendLine("$now numericalErrorAdded ${entry.key} ${entry.value}")
             }
             numericalErrorAdded.clear()
             for (entry in numericalErrorRemoved) {
-                builder.appendLine("${entry.timestamp} numericalErrorRemoved ${entry.sub} ${entry.error}")
+                builder.appendLine("$now numericalErrorRemoved ${entry.key} ${entry.value}")
             }
             numericalErrorRemoved.clear()
             for (entry in stalenessRemoved) {
-                builder.appendLine("${entry.timestamp} stalenessRemoved ${entry.sub} ${entry.error}")
+                builder.appendLine("$now stalenessRemoved ${entry.key} ${entry.value.toMillis()}")
             }
             stalenessRemoved.clear()
         }

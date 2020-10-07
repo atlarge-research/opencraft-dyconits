@@ -19,7 +19,8 @@ class DyconitSystem<SubKey, Message>(
         }
     private val dyconits = HashMap<String, Dyconit<SubKey, Message>>()
     private val subs = HashMap<SubKey, MutableSet<Dyconit<SubKey, Message>>>()
-    val perfCounterLogger = PerformanceCounterLogger()
+    private val callbackMap = HashMap<SubKey, Consumer<Message>>()
+    private val perfCounterLogger = PerformanceCounterLogger.instance
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -35,7 +36,9 @@ class DyconitSystem<SubKey, Message>(
     }
 
     fun getDyconit(name: String): Dyconit<SubKey, Message> {
-        dyconits[name].takeIf { it == null }.run { perfCounterLogger.dyconitsCreated.incrementAndGet() }
+        if (!dyconits.containsKey(name)) {
+            perfCounterLogger.dyconitsCreated.incrementAndGet()
+        }
         val dyconit = dyconits.getOrPut(name, { Dyconit(name) })
         logger.trace("dyconits total ${dyconits.size}")
         return dyconit
@@ -44,7 +47,7 @@ class DyconitSystem<SubKey, Message>(
     fun removeDyconit(name: String): Boolean {
         val deleted = dyconits.remove(name) != null
         logger.trace("dyconits total ${dyconits.size}")
-        deleted.takeIf { it }.run { perfCounterLogger.dyconitsRemoved.incrementAndGet() }
+        deleted.takeIf { it }?.run { perfCounterLogger.dyconitsRemoved.incrementAndGet() }
         return deleted
     }
 
@@ -53,14 +56,14 @@ class DyconitSystem<SubKey, Message>(
     }
 
     fun subscribe(sub: SubKey, callback: Consumer<Message>, bounds: Bounds, name: String) {
-        class Filtered : Consumer<Message> {
-            override fun accept(t: Message) {
-                if (filter.filter(sub, t)) {
-                    callback.accept(t)
+        val filteredCallback = callbackMap.getOrPut(sub, {
+            Consumer<Message> { m: Message ->
+                if (filter.filter(sub, m)) {
+                    callback.accept(m)
                 }
             }
-        }
-        subscribe(sub, Filtered(), bounds, getDyconit(name))
+        })
+        subscribe(sub, filteredCallback, bounds, getDyconit(name))
     }
 
     fun subscribe(sub: SubKey, callback: Consumer<Message>, bounds: Bounds, dyconit: Dyconit<SubKey, Message>) {
@@ -83,7 +86,7 @@ class DyconitSystem<SubKey, Message>(
     fun unsubscribe(sub: SubKey, dyconit: Dyconit<SubKey, Message>) {
         dyconit.removeSubscription(sub)
         subs.getOrPut(sub, { HashSet() }).remove(dyconit)
-        dyconit.takeIf { it.countSubscribers() <= 0 }?.let { dyconits.remove(it.name) }
+        dyconit.takeIf { it.countSubscribers() <= 0 }?.let { removeDyconit(it) }
         logger.trace("dyconit ${dyconit.name} subscribers ${dyconit.countSubscribers()}")
     }
 
