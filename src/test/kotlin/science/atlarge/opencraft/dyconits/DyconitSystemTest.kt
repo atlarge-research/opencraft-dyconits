@@ -104,7 +104,7 @@ internal class DyconitSystemTest {
         system = DyconitSystem(policy, filter, log = true)
         Thread.sleep(2000)
         assertEquals(true, system != null)
-        assertEquals(true, File(system!!.perfCounterLogger.logFilePath).isFile)
-        assertEquals(true, File(system!!.perfCounterLogger.logFilePath).delete())
+        assertEquals(true, File(PerformanceCounterLogger.instance.logFilePath).isFile)
+        assertEquals(true, File(PerformanceCounterLogger.instance.logFilePath).delete())
     }
 }

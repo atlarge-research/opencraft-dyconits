@@ -6,7 +6,7 @@
 
     <groupId>science.atlarge.opencraft</groupId>
     <artifactId>dyconits</artifactId>
-    <version>${jgitver.calculated_version}</version>
+    <version>1.0.1</version>
     <packaging>jar</packaging>
 
     <name>science.atlarge.opencraft dyconits</name>
