@@ -56,7 +56,7 @@ class PerformanceCounterLogger private constructor(val logFilePath: String = "dy
     }
 
     fun log() {
-        val now = Instant.now()
+        val now = Instant.now().toEpochMilli()
         val builder = StringBuilder()
         lock.withLock {
             for (entry in numericalErrorAdded) {
