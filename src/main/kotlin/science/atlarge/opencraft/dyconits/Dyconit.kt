@@ -12,18 +12,23 @@ import java.util.function.Consumer
  * while preventing large inconsistency.
  */
 class Dyconit<SubKey, Message>(val name: String) {
+
     private var subscriptions: MutableMap<SubKey, Subscription<SubKey, Message>> = Maps.newConcurrentMap()
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun addSubscription(sub: SubKey, bounds: Bounds, callback: Consumer<Message>) {
-        subscriptions.putIfAbsent(sub, Subscription(sub, bounds, callback))
+        when (val subscription = subscriptions[sub]) {
+            null -> subscriptions[sub] = Subscription(sub, bounds, callback)
+            else -> subscription.update(bounds = bounds, callback = callback)
+        }
         logger.trace("dyconit $name subscribers ${subscriptions.size}")
     }
 
     fun removeSubscription(sub: SubKey) {
         // TODO this does not flush queued messages. Needed?
         subscriptions.remove(sub)
+            ?.let { PerformanceCounterLogger.instance.updateBounds(Bounds.ZERO, previous = it.bounds) }
         logger.trace("dyconit $name subscribers ${subscriptions.size}")
     }
 
@@ -45,6 +50,10 @@ class Dyconit<SubKey, Message>(val name: String) {
 
     fun getSubscribers(): List<SubKey> {
         return subscriptions.keys.toList()
+    }
+
+    fun getSubscription(sub: SubKey): Subscription<SubKey, Message>? {
+        return subscriptions[sub]
     }
 
     fun close() {

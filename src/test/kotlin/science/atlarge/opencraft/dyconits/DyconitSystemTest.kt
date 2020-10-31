@@ -10,6 +10,7 @@ import science.atlarge.opencraft.messaging.Filter
 import java.io.File
 import java.util.function.Consumer
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 internal class DyconitSystemTest {
 
@@ -106,5 +107,21 @@ internal class DyconitSystemTest {
         assertEquals(true, system != null)
         assertEquals(true, File(PerformanceCounterLogger.instance.logFilePath).isFile)
         assertEquals(true, File(PerformanceCounterLogger.instance.logFilePath).delete())
+    }
+
+    @Test
+    fun setBounds() {
+        system?.subscribe(subscriberName, callback, bounds, dyconitName)
+        val bounds2 = bounds.copy(numerical = bounds.numerical + 1)
+        assertEquals(bounds, system?.getDyconit(dyconitName)?.getSubscription(subscriberName)?.bounds)
+        assertNotEquals(bounds2, system?.getDyconit(dyconitName)?.getSubscription(subscriberName)?.bounds)
+    }
+
+    @Test
+    fun updateBounds() {
+        system?.subscribe(subscriberName, callback, bounds, dyconitName)
+        val bounds2 = bounds.copy(numerical = bounds.numerical + 1)
+        system?.subscribe(subscriberName, callback, bounds2, dyconitName)
+        assertEquals(bounds2, system?.getDyconit(dyconitName)?.getSubscription(subscriberName)?.bounds)
     }
 }
