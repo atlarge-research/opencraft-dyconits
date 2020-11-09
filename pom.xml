@@ -6,7 +6,7 @@
 
     <groupId>science.atlarge.opencraft</groupId>
     <artifactId>dyconits</artifactId>
-    <version>1.0.5-SNAPSHOT</version>
+    <version>1.0.6-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>science.atlarge.opencraft dyconits</name>

@@ -3,13 +3,14 @@ package science.atlarge.opencraft.dyconits
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
 import java.util.*
-import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Consumer
-import kotlin.concurrent.withLock
 
 class Subscription<SubKey, Message>(
     val sub: SubKey,
@@ -22,7 +23,7 @@ class Subscription<SubKey, Message>(
         private set
     private val messageQueue: MutableList<DMessage<Message>> = ArrayList()
     private var timerSet = false
-    private val lock = ReentrantLock()
+    private val lock = Mutex()
     var timestampLastReset = Instant.now()
         private set
     val staleness: Duration
@@ -38,7 +39,7 @@ class Subscription<SubKey, Message>(
         PerformanceCounterLogger.instance.updateBounds(bounds)
     }
 
-    fun addMessage(msg: DMessage<Message>) {
+    fun addMessage(msg: DMessage<Message>) = runBlocking {
         lock.withLock {
             if (messageQueue.isEmpty()) {
                 firstMessageQueued = Instant.now()
@@ -68,7 +69,7 @@ class Subscription<SubKey, Message>(
                         staleness.toMillis()
                     } ~>= ${bounds.staleness}"
                 )
-                flush()
+                lock.withLock { flush() }
                 timerSet = false
             }
             timerSet = true
@@ -101,7 +102,7 @@ class Subscription<SubKey, Message>(
         this.callback = callback
     }
 
-    fun close() {
+    fun close() = runBlocking {
         lock.withLock {
             // TODO prevent policy resetting bounds
             bounds = Bounds.ZERO
