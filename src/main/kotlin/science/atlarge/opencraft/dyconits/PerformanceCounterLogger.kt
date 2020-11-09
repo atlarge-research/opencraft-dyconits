@@ -68,12 +68,12 @@ class PerformanceCounterLogger private constructor(val logFilePath: String = "dy
     }
 
     fun log() {
+        val builder = StringBuilder()
         if (!headerWritten) {
-            file.writeText("timestamp\tscope\tkey\tvalue")
+            builder.appendLine("timestamp\tscope\tkey\tvalue")
             headerWritten = true
         }
         val now = Instant.now().toEpochMilli()
-        val builder = StringBuilder()
         lock.withLock {
             for (entry in numericalErrorAdded) {
                 builder.appendLine("$now\t${entry.key}\tnumericalErrorAdded\t${entry.value}")
@@ -97,7 +97,7 @@ class PerformanceCounterLogger private constructor(val logFilePath: String = "dy
         repeat(queue.size) {
             builder.appendLine(queue.take())
         }
-        file.appendText(builder.toString())
+        file.writeText(builder.toString())
     }
 
     /**
