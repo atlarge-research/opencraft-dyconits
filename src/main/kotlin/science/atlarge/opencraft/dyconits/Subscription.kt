@@ -11,19 +11,32 @@ import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Consumer
 import kotlin.concurrent.withLock
 
-class Subscription<SubKey, Message>(val sub: SubKey, var bounds: Bounds, var callback: Consumer<Message>) {
+class Subscription<SubKey, Message>(
+    val sub: SubKey,
+    bounds: Bounds,
+    callback: Consumer<Message>
+) {
+    var bounds: Bounds = bounds
+        private set
+    var callback: Consumer<Message> = callback
+        private set
     private val messageQueue: MutableList<DMessage<Message>> = ArrayList()
     private var timerSet = false
     private val lock = ReentrantLock()
+    var timestampLastReset = Instant.now()
+        private set
     val staleness: Duration
-        get() = Duration.between(bounds.timestampLastReset, Instant.now())
+        get() = Duration.between(timestampLastReset, Instant.now())
     var numericalError = 0
         private set
     var firstMessageQueued: Instant = Instant.now()
         private set
 
-    private
-    val logger = LoggerFactory.getLogger(javaClass)
+    private val logger = LoggerFactory.getLogger(javaClass)
+
+    init {
+        PerformanceCounterLogger.instance.updateBounds(bounds)
+    }
 
     fun addMessage(msg: DMessage<Message>) {
         lock.withLock {
@@ -52,10 +65,7 @@ class Subscription<SubKey, Message>(val sub: SubKey, var bounds: Bounds, var cal
                 delay(delayMS)
                 logger.trace(
                     "flush cause timer ${
-                        Duration.between(
-                            bounds.timestampLastReset,
-                            Instant.now()
-                        ).toMillis()
+                        staleness.toMillis()
                     } ~>= ${bounds.staleness}"
                 )
                 flush()
@@ -80,9 +90,15 @@ class Subscription<SubKey, Message>(val sub: SubKey, var bounds: Bounds, var cal
 
         messageQueue.forEach { m -> callback.accept(m.message) }
 
-        bounds.timestampLastReset = now
+        timestampLastReset = now
         messageQueue.clear()
         numericalError = 0
+    }
+
+    fun update(bounds: Bounds = this.bounds, callback: Consumer<Message> = this.callback) {
+        PerformanceCounterLogger.instance.updateBounds(bounds, previous = this.bounds)
+        this.bounds = bounds
+        this.callback = callback
     }
 
     fun close() {
