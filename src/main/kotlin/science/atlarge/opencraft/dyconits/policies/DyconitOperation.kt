@@ -2,7 +2,7 @@ package science.atlarge.opencraft.dyconits.policies
 
 import science.atlarge.opencraft.dyconits.Bounds
 import science.atlarge.opencraft.dyconits.DyconitSystem
-import java.util.function.Consumer
+import science.atlarge.opencraft.dyconits.MessageChannel
 
 interface DyconitCommand<SubKey, Message> {
     fun execute(dyconitSystem: DyconitSystem<SubKey, Message>)
@@ -10,7 +10,7 @@ interface DyconitCommand<SubKey, Message> {
 
 class DyconitSubscribeCommand<SubKey, Message>(
     val subscriber: SubKey,
-    val callback: Consumer<Message>,
+    val callback: MessageChannel<Message>,
     val bounds: Bounds,
     val name: String
 ) :

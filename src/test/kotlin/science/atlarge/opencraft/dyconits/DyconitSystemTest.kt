@@ -8,7 +8,6 @@ import science.atlarge.opencraft.dyconits.policies.DyconitPolicy
 import science.atlarge.opencraft.dyconits.policies.DyconitSubscribeCommand
 import science.atlarge.opencraft.messaging.Filter
 import java.io.File
-import java.util.function.Consumer
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
@@ -16,7 +15,17 @@ internal class DyconitSystemTest {
 
     val subscriberName = "sub1"
     val sentMessages = ArrayList<String>()
-    val callback = Consumer<String> { t -> sentMessages.add(t) }
+    val callback = object : MessageChannel<String> {
+        val messages = ArrayList<String>()
+        override fun send(msg: String) {
+            messages.add(msg)
+        }
+
+        override fun flush() {
+            sentMessages.addAll(messages)
+            messages.clear()
+        }
+    }
     val subscriber = Subscriber(subscriberName, callback)
     val bounds = Bounds(0, 0)
     val dyconitName = "d1"

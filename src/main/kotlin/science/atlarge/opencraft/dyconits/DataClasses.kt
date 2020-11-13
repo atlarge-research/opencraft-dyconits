@@ -1,8 +1,6 @@
 package science.atlarge.opencraft.dyconits
 
-import java.util.function.Consumer
-
-data class Subscriber<SubKey, Message>(val key: SubKey, val callback: Consumer<Message>)
+data class Subscriber<SubKey, Message>(val key: SubKey, val callback: MessageChannel<Message>)
 
 /**
  * A Minecraft Message wrapped to include message weight.

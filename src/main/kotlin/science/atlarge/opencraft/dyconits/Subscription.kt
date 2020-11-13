@@ -10,16 +10,15 @@ import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
 import java.util.*
-import java.util.function.Consumer
 
 class Subscription<SubKey, Message>(
     val sub: SubKey,
     bounds: Bounds,
-    callback: Consumer<Message>
+    callback: MessageChannel<Message>
 ) {
     var bounds: Bounds = bounds
         private set
-    var callback: Consumer<Message> = callback
+    var callback: MessageChannel<Message> = callback
         private set
     private val messageQueue: MutableList<DMessage<Message>> = ArrayList()
     private var timerSet = false
@@ -36,7 +35,7 @@ class Subscription<SubKey, Message>(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     init {
-        PerformanceCounterLogger.instance.updateBounds(bounds)
+//        PerformanceCounterLogger.instance.updateBounds(bounds)
     }
 
     fun addMessage(msg: DMessage<Message>) = runBlocking {
@@ -46,8 +45,8 @@ class Subscription<SubKey, Message>(
             }
             messageQueue.add(msg)
             numericalError += msg.weight
-            logger.trace("queue weight $numericalError")
-            logger.trace("queue length ${messageQueue.size}")
+            // logger.trace("queue weight $numericalError")
+            // logger.trace("queue length ${messageQueue.size}")
             checkBounds()
         }
     }
@@ -55,20 +54,20 @@ class Subscription<SubKey, Message>(
     private fun checkBounds() {
         val timeSinceLastFlush = staleness
         if (bounds.staleness in 0..timeSinceLastFlush.toMillis()) {
-            logger.trace("flush cause staleness $timeSinceLastFlush >= ${bounds.staleness}")
+            // logger.trace("flush cause staleness $timeSinceLastFlush >= ${bounds.staleness}")
             flush()
         } else if (bounds.numerical in 0 until numericalError) {
-            logger.trace("flush cause numerical $numericalError > ${bounds.numerical}")
+            // logger.trace("flush cause numerical $numericalError > ${bounds.numerical}")
             flush()
         } else if (bounds.staleness >= 0 && !timerSet) {
             val delayMS = bounds.staleness - timeSinceLastFlush.toMillis()
             GlobalScope.launch {
                 delay(delayMS)
-                logger.trace(
-                    "flush cause timer ${
-                        staleness.toMillis()
-                    } ~>= ${bounds.staleness}"
-                )
+//                logger.trace(
+//                    "flush cause timer ${
+//                        staleness.toMillis()
+//                    } ~>= ${bounds.staleness}"
+//                )
                 lock.withLock { flush() }
                 timerSet = false
             }
@@ -78,26 +77,27 @@ class Subscription<SubKey, Message>(
 
     private fun flush() {
         timerSet = false
-        val instance = PerformanceCounterLogger.instance
-        val sum = messageQueue.map { it.weight }.sum()
+//        val instance = PerformanceCounterLogger.instance
+//        val sum = messageQueue.map { it.weight }.sum()
         val now = Instant.now()
 
-        instance.messagesSent.addAndGet(messageQueue.size)
-        instance.numericalErrorSent.addAndGet(sum)
-        instance.removeNumericalError(sub!!, sum)
-        if (messageQueue.isNotEmpty()) {
-            instance.removeStaleness(sub, Duration.between(firstMessageQueued, now))
-        }
+//        instance.messagesSent.addAndGet(messageQueue.size)
+//        instance.numericalErrorSent.addAndGet(sum)
+//        instance.removeNumericalError(sub!!, sum)
+//        if (messageQueue.isNotEmpty()) {
+//            instance.removeStaleness(sub, Duration.between(firstMessageQueued, now))
+//        }
 
-        messageQueue.forEach { m -> callback.accept(m.message) }
+        messageQueue.forEach { m -> callback.send(m.message) }
+        callback.flush()
 
         timestampLastReset = now
         messageQueue.clear()
         numericalError = 0
     }
 
-    fun update(bounds: Bounds = this.bounds, callback: Consumer<Message> = this.callback) {
-        PerformanceCounterLogger.instance.updateBounds(bounds, previous = this.bounds)
+    fun update(bounds: Bounds = this.bounds, callback: MessageChannel<Message> = this.callback) {
+//        PerformanceCounterLogger.instance.updateBounds(bounds, previous = this.bounds)
         this.bounds = bounds
         this.callback = callback
     }

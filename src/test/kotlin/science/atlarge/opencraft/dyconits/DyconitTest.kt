@@ -3,7 +3,6 @@ package science.atlarge.opencraft.dyconits
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.util.function.Consumer
 import kotlin.test.assertEquals
 
 class DyconitTest {
@@ -16,7 +15,17 @@ class DyconitTest {
     val boundsZeroTime = Bounds(0, Int.MAX_VALUE)
     val boundsSecondTime = Bounds(1000, Int.MAX_VALUE)
     val sentMessages = ArrayList<String>()
-    val callback = Consumer<String> { t -> sentMessages.add(t) }
+    val callback = object : MessageChannel<String> {
+        val messages = ArrayList<String>()
+        override fun send(msg: String) {
+            messages.add(msg)
+        }
+
+        override fun flush() {
+            sentMessages.addAll(messages)
+            messages.clear()
+        }
+    }
     val msg = "hello world"
 
     @BeforeEach
