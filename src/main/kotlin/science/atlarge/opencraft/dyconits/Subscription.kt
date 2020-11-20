@@ -1,15 +1,14 @@
 package science.atlarge.opencraft.dyconits
 
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.sendBlocking
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
-import java.util.*
 
 class Subscription<SubKey, Message>(
     val sub: SubKey,
@@ -20,9 +19,10 @@ class Subscription<SubKey, Message>(
         private set
     var callback: MessageChannel<Message> = callback
         private set
-    private val messageQueue: MutableList<DMessage<Message>> = ArrayList()
+    private val messageChannel = Channel<ChannelItem<DMessage<Message>>>(Channel.UNLIMITED)
+    private val messageQueue = ArrayList<DMessage<Message>>()
     private var timerSet = false
-    private val lock = Mutex()
+    private var stopped = false
     var timestampLastReset = Instant.now()
         private set
     val staleness: Duration
@@ -36,29 +36,44 @@ class Subscription<SubKey, Message>(
 
     init {
 //        PerformanceCounterLogger.instance.updateBounds(bounds)
-    }
-
-    fun addMessage(msg: DMessage<Message>) = runBlocking {
-        lock.withLock {
-            if (messageQueue.isEmpty()) {
-                firstMessageQueued = Instant.now()
+        GlobalScope.launch {
+            while (!stopped) {
+                when (val msg = messageChannel.receive()) {
+                    is ChannelMessage<DMessage<Message>> -> {
+                        messageQueue.add(msg.msg)
+                        numericalError += msg.msg.weight
+                        if (boundsExceeded()) {
+                            flush()
+                        }
+                    }
+                    is FlushToken -> flush()
+                }
             }
-            messageQueue.add(msg)
-            numericalError += msg.weight
-            // logger.trace("queue weight $numericalError")
-            // logger.trace("queue length ${messageQueue.size}")
-            checkBounds()
         }
     }
 
-    private fun checkBounds() {
+    fun addMessage(msg: DMessage<Message>) {
+        messageChannel.sendBlocking(ChannelMessage(msg))
+//        lock.withLock {
+//            if (messageQueue.isEmpty()) {
+//                firstMessageQueued = Instant.now()
+//            }
+//            messageQueue.add(msg)
+//            numericalError += msg.weight
+//            // logger.trace("queue weight $numericalError")
+//            // logger.trace("queue length ${messageQueue.size}")
+//            checkBounds()
+//        }
+    }
+
+    private fun boundsExceeded(): Boolean {
         val timeSinceLastFlush = staleness
         if (bounds.staleness in 0..timeSinceLastFlush.toMillis()) {
             // logger.trace("flush cause staleness $timeSinceLastFlush >= ${bounds.staleness}")
-            flush()
+            return true
         } else if (bounds.numerical in 0 until numericalError) {
             // logger.trace("flush cause numerical $numericalError > ${bounds.numerical}")
-            flush()
+            return true
         } else if (bounds.staleness >= 0 && !timerSet) {
             val delayMS = bounds.staleness - timeSinceLastFlush.toMillis()
             GlobalScope.launch {
@@ -68,11 +83,12 @@ class Subscription<SubKey, Message>(
 //                        staleness.toMillis()
 //                    } ~>= ${bounds.staleness}"
 //                )
-                lock.withLock { flush() }
+                messageChannel.send(FlushToken())
                 timerSet = false
             }
             timerSet = true
         }
+        return false
     }
 
     private fun flush() {
@@ -102,11 +118,11 @@ class Subscription<SubKey, Message>(
         this.callback = callback
     }
 
+    // FIXME fix close
     fun close() = runBlocking {
-        lock.withLock {
-            // TODO prevent policy resetting bounds
-            bounds = Bounds.ZERO
-            flush()
-        }
+        // TODO prevent policy resetting bounds
+        bounds = Bounds.ZERO
+//            flush()
+        stopped = true
     }
 }

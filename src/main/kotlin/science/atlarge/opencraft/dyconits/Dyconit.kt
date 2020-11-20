@@ -32,9 +32,10 @@ class Dyconit<SubKey, Message>(val name: String) {
     }
 
     fun addMessage(message: DMessage<Message>) {
-        subscriptions.entries.parallelStream()
-            .map { it.value }
-            .forEach { it.addMessage(message) }
+        subscriptions.values.forEach { it.addMessage(message) }
+//        subscriptions.entries.parallelStream()
+//            .map { it.value }
+//            .forEach { it.addMessage(message) }
 //        val count = subscriptions.entries.count()
 //        val instance = PerformanceCounterLogger.instance
 //        val error = count * message.weight
