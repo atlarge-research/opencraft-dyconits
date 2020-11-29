@@ -37,17 +37,21 @@ class Subscription<SubKey, Message>(
     init {
 //        PerformanceCounterLogger.instance.updateBounds(bounds)
         GlobalScope.launch {
-            while (!stopped) {
-                when (val msg = messageChannel.receive()) {
-                    is ChannelMessage<DMessage<Message>> -> {
-                        messageQueue.add(msg.msg)
-                        numericalError += msg.msg.weight
-                        if (boundsExceeded()) {
-                            flush()
+            kotlin.runCatching {
+                while (!stopped) {
+                    when (val msg = messageChannel.receive()) {
+                        is ChannelMessage<DMessage<Message>> -> {
+                            messageQueue.add(msg.msg.message)
+                            numericalError += msg.msg.weight
+                            if (boundsExceeded()) {
+                                flush()
+                            }
                         }
+                        is FlushToken -> flush()
                     }
-                    is FlushToken -> flush()
                 }
+            }.onFailure {
+                logger.error("Failure in sync coroutine", it)
             }
         }
     }
