@@ -8,6 +8,7 @@ import java.util.*
 class DyconitSystem<SubKey, Message>(
     policy: DyconitPolicy<SubKey, Message>,
     val filter: Filter<SubKey, Message>,
+    private val messageQueueFactory: MessageQueueFactory<Message> = DefaultQueueFactory(),
     log: Boolean = false
 ) {
     var policy = policy
@@ -37,7 +38,7 @@ class DyconitSystem<SubKey, Message>(
 //        if (!dyconits.containsKey(name)) {
 //            perfCounterLogger.dyconitsCreated.incrementAndGet()
 //        }
-        val dyconit = dyconits.getOrPut(name, { Dyconit(name) })
+        val dyconit = dyconits.getOrPut(name, { Dyconit(name, messageQueueFactory) })
         // logger.trace("dyconits total ${dyconits.size}")
         return dyconit
     }

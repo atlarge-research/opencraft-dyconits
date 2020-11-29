@@ -10,7 +10,10 @@ import org.slf4j.LoggerFactory
  * Outgoing messages are sent to a dyconit, which lazily forwards them to subscribers (players)
  * while preventing large inconsistency.
  */
-class Dyconit<SubKey, Message>(val name: String) {
+class Dyconit<SubKey, Message>(
+    val name: String,
+    private val queueFactory: MessageQueueFactory<Message> = DefaultQueueFactory()
+) {
 
     private var subscriptions: MutableMap<SubKey, Subscription<SubKey, Message>> = Maps.newConcurrentMap()
 
@@ -18,7 +21,7 @@ class Dyconit<SubKey, Message>(val name: String) {
 
     fun addSubscription(sub: SubKey, bounds: Bounds, callback: MessageChannel<Message>) {
         when (val subscription = subscriptions[sub]) {
-            null -> subscriptions[sub] = Subscription(sub, bounds, callback)
+            null -> subscriptions[sub] = Subscription(sub, bounds, callback, queueFactory.newMessageQueue())
             else -> subscription.update(bounds = bounds, callback = callback)
         }
         // logger.trace("dyconit $name subscribers ${subscriptions.size}")

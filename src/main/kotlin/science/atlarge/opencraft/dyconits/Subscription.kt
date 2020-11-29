@@ -13,14 +13,14 @@ import java.time.Instant
 class Subscription<SubKey, Message>(
     val sub: SubKey,
     bounds: Bounds,
-    callback: MessageChannel<Message>
+    callback: MessageChannel<Message>,
+    private val messageQueue: MessageQueue<Message>
 ) {
     var bounds: Bounds = bounds
         private set
     var callback: MessageChannel<Message> = callback
         private set
     private val messageChannel = Channel<ChannelItem<DMessage<Message>>>(Channel.UNLIMITED)
-    private val messageQueue = ArrayList<DMessage<Message>>()
     private var timerSet = false
     private var stopped = false
     var timestampLastReset = Instant.now()
@@ -104,7 +104,7 @@ class Subscription<SubKey, Message>(
 //            instance.removeStaleness(sub, Duration.between(firstMessageQueued, now))
 //        }
 
-        messageQueue.forEach { m -> callback.send(m.message) }
+        messageQueue.forEach { m -> callback.send(m) }
         callback.flush()
 
         timestampLastReset = now
