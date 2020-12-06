@@ -1,11 +1,8 @@
 package science.atlarge.opencraft.dyconits
 
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.sendBlocking
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
@@ -14,7 +11,8 @@ class Subscription<SubKey, Message>(
     val sub: SubKey,
     bounds: Bounds,
     callback: MessageChannel<Message>,
-    private val messageQueue: MessageQueue<Message>
+    private val messageQueue: MessageQueue<Message>,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     var bounds: Bounds = bounds
         private set
@@ -36,7 +34,7 @@ class Subscription<SubKey, Message>(
 
     init {
 //        PerformanceCounterLogger.instance.updateBounds(bounds)
-        GlobalScope.launch {
+        GlobalScope.launch(dispatcher) {
             kotlin.runCatching {
                 while (!stopped) {
                     when (val msg = messageChannel.receive()) {

@@ -1,14 +1,18 @@
 package science.atlarge.opencraft.dyconits
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import org.slf4j.LoggerFactory
 import science.atlarge.opencraft.dyconits.policies.DyconitPolicy
 import science.atlarge.opencraft.messaging.Filter
 import java.util.*
+import java.util.concurrent.ExecutorService
 
 class DyconitSystem<SubKey, Message>(
     policy: DyconitPolicy<SubKey, Message>,
     val filter: Filter<SubKey, Message>,
     private val messageQueueFactory: MessageQueueFactory<Message> = DefaultQueueFactory(),
+    private val executorService: ExecutorService? = null,
     log: Boolean = false
 ) {
     var policy = policy
@@ -29,6 +33,10 @@ class DyconitSystem<SubKey, Message>(
 //        }
 //    }
 
+    init {
+        System.setProperty("kotlinx.coroutines.scheduler", "off")
+    }
+
     fun update(sub: Subscriber<SubKey, Message>) {
         val commands = policy.update(sub)
         commands.forEach { it.execute(this) }
@@ -38,7 +46,10 @@ class DyconitSystem<SubKey, Message>(
 //        if (!dyconits.containsKey(name)) {
 //            perfCounterLogger.dyconitsCreated.incrementAndGet()
 //        }
-        val dyconit = dyconits.getOrPut(name, { Dyconit(name, messageQueueFactory) })
+        val dyconit =
+            dyconits.getOrPut(
+                name,
+                { Dyconit(name, messageQueueFactory, executorService?.asCoroutineDispatcher() ?: Dispatchers.Default) })
         // logger.trace("dyconits total ${dyconits.size}")
         return dyconit
     }

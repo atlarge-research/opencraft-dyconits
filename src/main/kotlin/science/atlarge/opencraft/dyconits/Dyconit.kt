@@ -1,6 +1,8 @@
 package science.atlarge.opencraft.dyconits
 
 import com.google.common.collect.Maps
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import org.slf4j.LoggerFactory
 
 /**
@@ -12,7 +14,8 @@ import org.slf4j.LoggerFactory
  */
 class Dyconit<SubKey, Message>(
     val name: String,
-    private val queueFactory: MessageQueueFactory<Message> = DefaultQueueFactory()
+    private val queueFactory: MessageQueueFactory<Message> = DefaultQueueFactory(),
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
 
     private var subscriptions: MutableMap<SubKey, Subscription<SubKey, Message>> = Maps.newConcurrentMap()
@@ -21,7 +24,8 @@ class Dyconit<SubKey, Message>(
 
     fun addSubscription(sub: SubKey, bounds: Bounds, callback: MessageChannel<Message>) {
         when (val subscription = subscriptions[sub]) {
-            null -> subscriptions[sub] = Subscription(sub, bounds, callback, queueFactory.newMessageQueue())
+            null -> subscriptions[sub] =
+                Subscription(sub, bounds, callback, queueFactory.newMessageQueue(), dispatcher = dispatcher)
             else -> subscription.update(bounds = bounds, callback = callback)
         }
         // logger.trace("dyconit $name subscribers ${subscriptions.size}")
