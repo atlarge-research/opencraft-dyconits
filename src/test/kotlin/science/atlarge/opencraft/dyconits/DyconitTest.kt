@@ -59,6 +59,7 @@ class DyconitTest {
         dyconit.addMessage(DMessage(msg, 1))
         Thread.sleep(1000)
         dyconit.synchronize()
+        callback.flush()
         assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
@@ -68,6 +69,7 @@ class DyconitTest {
         dyconit.addMessage(DMessage(msg, 0))
         Thread.sleep(1000)
         dyconit.synchronize()
+        callback.flush()
         assertEquals(null, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
@@ -79,6 +81,7 @@ class DyconitTest {
         dyconit.addMessage(DMessage(msg, 2))
         Thread.sleep(1000)
         dyconit.synchronize()
+        callback.flush()
         assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
         assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
@@ -89,6 +92,7 @@ class DyconitTest {
         dyconit.addMessage(DMessage(msg, 0))
         Thread.sleep(1000)
         dyconit.synchronize()
+        callback.flush()
         assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
@@ -97,6 +101,7 @@ class DyconitTest {
         dyconit.addSubscription(subscriber, boundsSecondTime, callback)
         dyconit.addMessage(DMessage(msg, 0))
         dyconit.synchronize()
+        callback.flush()
         assertEquals(null, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
@@ -105,12 +110,15 @@ class DyconitTest {
         dyconit.addSubscription(subscriber, boundsSecondTime, callback)
         dyconit.addMessage(DMessage(msg, 0))
         dyconit.synchronize()
+        callback.flush()
         assertEquals(0, sentMessages.size)
         dyconit.addMessage(DMessage(msg, 0))
         dyconit.synchronize()
+        callback.flush()
         assertEquals(0, sentMessages.size)
         Thread.sleep(1100)
         dyconit.synchronize()
+        callback.flush()
         assertEquals(msg, sentMessages.poll(10, TimeUnit.MILLISECONDS))
         assertEquals(msg, sentMessages.poll(10, TimeUnit.MILLISECONDS))
     }

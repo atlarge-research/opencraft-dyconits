@@ -131,7 +131,13 @@ class DyconitSystem<SubKey, Message>(
     }
 
     fun synchronize() {
-        dyconits.values.forEach { it.synchronize() }
+        subs.entries.parallelStream().forEach {
+            for (dyconit in it.value) {
+                val subscription = dyconit.getSubscription(it.key) ?: continue
+                subscription.synchronize()
+            }
+            callbackMap[it.key]?.flush()
+        }
     }
 
     fun countDyconits(): Int {

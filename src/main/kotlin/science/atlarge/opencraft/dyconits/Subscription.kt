@@ -61,7 +61,7 @@ class Subscription<SubKey, Message>(
         return false
     }
 
-    private fun flush() {
+    private fun send() {
         timerSet = false
 //        val instance = PerformanceCounterLogger.instance
 //        val sum = messageQueue.map { it.weight }.sum()
@@ -78,14 +78,13 @@ class Subscription<SubKey, Message>(
             val msg = messageQueue.poll() ?: break
             callback.send(msg)
         }
-        callback.flush()
         timestampLastReset = now
         numericalError.reset()
     }
 
     fun synchronize() {
         if (boundsExceeded()) {
-            flush()
+            send()
         }
     }
 
