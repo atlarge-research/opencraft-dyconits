@@ -107,6 +107,7 @@ internal class DyconitSystemTest {
         val msg = "hello world"
         system?.update(subscriber)
         system?.publish(Unit, msg)
+        system?.synchronize()
         assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 

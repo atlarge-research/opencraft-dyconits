@@ -57,6 +57,8 @@ class DyconitTest {
     fun addMessageSend() {
         dyconit.addSubscription(subscriber, boundsZeroNumerical, callback)
         dyconit.addMessage(DMessage(msg, 1))
+        Thread.sleep(1000)
+        dyconit.synchronize()
         assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
@@ -64,6 +66,8 @@ class DyconitTest {
     fun addMessageNoSend() {
         dyconit.addSubscription(subscriber, boundsOneNumerical, callback)
         dyconit.addMessage(DMessage(msg, 0))
+        Thread.sleep(1000)
+        dyconit.synchronize()
         assertEquals(null, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
@@ -73,6 +77,8 @@ class DyconitTest {
         dyconit.addMessage(DMessage(msg, 0))
         assertEquals(0, sentMessages.size)
         dyconit.addMessage(DMessage(msg, 2))
+        Thread.sleep(1000)
+        dyconit.synchronize()
         assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
         assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
@@ -81,6 +87,8 @@ class DyconitTest {
     fun addMessageSendTime() {
         dyconit.addSubscription(subscriber, boundsZeroTime, callback)
         dyconit.addMessage(DMessage(msg, 0))
+        Thread.sleep(1000)
+        dyconit.synchronize()
         assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
@@ -88,6 +96,7 @@ class DyconitTest {
     fun addMessageNoSendTime() {
         dyconit.addSubscription(subscriber, boundsSecondTime, callback)
         dyconit.addMessage(DMessage(msg, 0))
+        dyconit.synchronize()
         assertEquals(null, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
@@ -95,11 +104,15 @@ class DyconitTest {
     fun addMessageSendAfterSecond() {
         dyconit.addSubscription(subscriber, boundsSecondTime, callback)
         dyconit.addMessage(DMessage(msg, 0))
+        dyconit.synchronize()
         assertEquals(0, sentMessages.size)
         dyconit.addMessage(DMessage(msg, 0))
+        dyconit.synchronize()
         assertEquals(0, sentMessages.size)
-        assertEquals(msg, sentMessages.poll(1100, TimeUnit.MILLISECONDS))
-        assertEquals(msg, sentMessages.poll(1100, TimeUnit.MILLISECONDS))
+        Thread.sleep(1100)
+        dyconit.synchronize()
+        assertEquals(msg, sentMessages.poll(10, TimeUnit.MILLISECONDS))
+        assertEquals(msg, sentMessages.poll(10, TimeUnit.MILLISECONDS))
     }
 
     @Test

@@ -130,6 +130,10 @@ class DyconitSystem<SubKey, Message>(
         dyconit.addMessage(DMessage(message, policy.weigh(message)))
     }
 
+    fun synchronize() {
+        dyconits.values.forEach { it.synchronize() }
+    }
+
     fun countDyconits(): Int {
         return dyconits.size
     }

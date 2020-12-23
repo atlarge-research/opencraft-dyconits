@@ -1,61 +1,42 @@
 package science.atlarge.opencraft.dyconits
 
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.sendBlocking
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.LongAdder
 
 class Subscription<SubKey, Message>(
     val sub: SubKey,
     bounds: Bounds,
     callback: MessageChannel<Message>,
-    private val messageQueue: MessageQueue<Message>,
+    private val tmpNotUsed: MessageQueue<Message>,
     dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
+    val messageQueue = ConcurrentLinkedQueue<Message>()
     var bounds: Bounds = bounds
         private set
     var callback: MessageChannel<Message> = callback
         private set
-    private val messageChannel = Channel<ChannelItem<DMessage<Message>>>(Channel.UNLIMITED)
     private var timerSet = false
     private var stopped = false
     var timestampLastReset = Instant.now()
         private set
     val staleness: Duration
         get() = Duration.between(timestampLastReset, Instant.now())
-    var numericalError = 0
+    var numericalError = LongAdder()
         private set
     var firstMessageQueued: Instant = Instant.now()
         private set
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    init {
-//        PerformanceCounterLogger.instance.updateBounds(bounds)
-        GlobalScope.launch(dispatcher) {
-            kotlin.runCatching {
-                while (!stopped) {
-                    when (val msg = messageChannel.receive()) {
-                        is ChannelMessage<DMessage<Message>> -> {
-                            messageQueue.add(msg.msg.message)
-                            numericalError += msg.msg.weight
-                            if (boundsExceeded()) {
-                                flush()
-                            }
-                        }
-                        is FlushToken -> flush()
-                    }
-                }
-            }.onFailure {
-                logger.error("Failure in sync coroutine", it)
-            }
-        }
-    }
-
     fun addMessage(msg: DMessage<Message>) {
-        messageChannel.sendBlocking(ChannelMessage(msg))
+        messageQueue.offer(msg.message)
+        numericalError.add(msg.weight.toLong())
 //        lock.withLock {
 //            if (messageQueue.isEmpty()) {
 //                firstMessageQueued = Instant.now()
@@ -73,22 +54,9 @@ class Subscription<SubKey, Message>(
         if (bounds.staleness in 0..timeSinceLastFlush.toMillis()) {
             // logger.trace("flush cause staleness $timeSinceLastFlush >= ${bounds.staleness}")
             return true
-        } else if (bounds.numerical in 0 until numericalError) {
+        } else if (bounds.numerical in 0 until numericalError.toInt()) {
             // logger.trace("flush cause numerical $numericalError > ${bounds.numerical}")
             return true
-        } else if (bounds.staleness >= 0 && !timerSet) {
-            val delayMS = bounds.staleness - timeSinceLastFlush.toMillis()
-            GlobalScope.launch {
-                delay(delayMS)
-//                logger.trace(
-//                    "flush cause timer ${
-//                        staleness.toMillis()
-//                    } ~>= ${bounds.staleness}"
-//                )
-                messageChannel.send(FlushToken())
-                timerSet = false
-            }
-            timerSet = true
         }
         return false
     }
@@ -106,12 +74,19 @@ class Subscription<SubKey, Message>(
 //            instance.removeStaleness(sub, Duration.between(firstMessageQueued, now))
 //        }
 
-        messageQueue.forEach { m -> callback.send(m) }
+        while (!messageQueue.isEmpty()) {
+            val msg = messageQueue.poll() ?: break
+            callback.send(msg)
+        }
         callback.flush()
-
         timestampLastReset = now
-        messageQueue.clear()
-        numericalError = 0
+        numericalError.reset()
+    }
+
+    fun synchronize() {
+        if (boundsExceeded()) {
+            flush()
+        }
     }
 
     fun update(bounds: Bounds = this.bounds, callback: MessageChannel<Message> = this.callback) {

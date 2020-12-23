@@ -63,6 +63,10 @@ class Dyconit<SubKey, Message>(
         return subscriptions[sub]
     }
 
+    fun synchronize() {
+        subscriptions.values.forEach { it.synchronize() }
+    }
+
     fun close() {
         // TODO prevent new subscriptions from being added
         subscriptions.values.parallelStream().forEach { it.close() }
