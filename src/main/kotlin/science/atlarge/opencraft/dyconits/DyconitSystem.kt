@@ -130,14 +130,23 @@ class DyconitSystem<SubKey, Message>(
         dyconit.addMessage(DMessage(message, policy.weigh(message)))
     }
 
-    fun synchronize() {
-        subs.entries.parallelStream().forEach {
+    fun synchronize(): Error {
+        return subs.entries.parallelStream().map {
+            var numError = 0
+            var staleness = java.time.Duration.ZERO
             for (dyconit in it.value) {
                 val subscription = dyconit.getSubscription(it.key) ?: continue
-                subscription.synchronize()
+                val error = subscription.synchronize()
+                if (!error.exceedsBounds) {
+                    numError += error.numerical
+                    if (error.staleness > staleness) {
+                        staleness = error.staleness
+                    }
+                }
             }
             callbackMap[it.key]?.flush()
-        }
+            Error(staleness, numError, true)
+        }.reduce(Error.ZERO, Error::plus)
     }
 
     fun countDyconits(): Int {

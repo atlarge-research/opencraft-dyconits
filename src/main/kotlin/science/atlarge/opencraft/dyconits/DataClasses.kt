@@ -1,5 +1,7 @@
 package science.atlarge.opencraft.dyconits
 
+import java.time.Duration
+
 data class Subscriber<SubKey, Message>(val key: SubKey, val callback: MessageChannel<Message>)
 
 /**
@@ -13,9 +15,19 @@ data class DMessage<Message>(val message: Message, val weight: Int)
  *
  * Staleness is measured in milliseconds.
  */
-data class Bounds constructor(val staleness: Int, val numerical: Int) {
+data class Bounds(val staleness: Int, val numerical: Int) {
     companion object {
         val ZERO = Bounds(0, 0)
         val INFINITE = Bounds(-1, -1)
+    }
+}
+
+data class Error(val staleness: Duration, val numerical: Int, val exceedsBounds: Boolean) {
+    companion object {
+        val ZERO = Error(Duration.ZERO, 0, false)
+    }
+
+    fun plus(error: Error): Error {
+        return Error(staleness + error.staleness, numerical + error.numerical, exceedsBounds || error.exceedsBounds)
     }
 }

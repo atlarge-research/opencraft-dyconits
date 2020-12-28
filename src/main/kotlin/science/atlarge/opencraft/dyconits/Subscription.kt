@@ -6,17 +6,15 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.LongAdder
 
 class Subscription<SubKey, Message>(
     val sub: SubKey,
     bounds: Bounds,
     callback: MessageChannel<Message>,
-    private val tmpNotUsed: MessageQueue<Message>,
+    private val messageQueue: MessageQueue<Message>,
     dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
-    val messageQueue = ConcurrentLinkedQueue<Message>()
     var bounds: Bounds = bounds
         private set
     var callback: MessageChannel<Message> = callback
@@ -35,7 +33,7 @@ class Subscription<SubKey, Message>(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun addMessage(msg: DMessage<Message>) {
-        messageQueue.offer(msg.message)
+        messageQueue.add(msg.message)
         numericalError.add(msg.weight.toLong())
 //        lock.withLock {
 //            if (messageQueue.isEmpty()) {
@@ -49,16 +47,17 @@ class Subscription<SubKey, Message>(
 //        }
     }
 
-    private fun boundsExceeded(): Boolean {
+    private fun boundsExceeded(): Error {
         val timeSinceLastFlush = staleness
+        val numError = numericalError.toInt()
         if (bounds.staleness in 0..timeSinceLastFlush.toMillis()) {
             // logger.trace("flush cause staleness $timeSinceLastFlush >= ${bounds.staleness}")
-            return true
-        } else if (bounds.numerical in 0 until numericalError.toInt()) {
+            return Error(timeSinceLastFlush, numError, true)
+        } else if (bounds.numerical in 0 until numError) {
             // logger.trace("flush cause numerical $numericalError > ${bounds.numerical}")
-            return true
+            return Error(timeSinceLastFlush, numError, true)
         }
-        return false
+        return Error(timeSinceLastFlush, numError, false)
     }
 
     private fun send() {
@@ -75,17 +74,18 @@ class Subscription<SubKey, Message>(
 //        }
 
         while (!messageQueue.isEmpty()) {
-            val msg = messageQueue.poll() ?: break
-            callback.send(msg)
+            callback.send(messageQueue.remove())
         }
         timestampLastReset = now
         numericalError.reset()
     }
 
-    fun synchronize() {
-        if (boundsExceeded()) {
+    fun synchronize(): Error {
+        val error = boundsExceeded()
+        if (error.exceedsBounds) {
             send()
         }
+        return error
     }
 
     fun update(bounds: Bounds = this.bounds, callback: MessageChannel<Message> = this.callback) {

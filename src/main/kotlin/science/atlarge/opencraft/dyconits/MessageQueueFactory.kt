@@ -4,22 +4,25 @@ interface MessageQueueFactory<T> {
     fun newMessageQueue(): MessageQueue<T>
 }
 
-interface MessageQueue<T> : Iterable<T> {
+interface MessageQueue<T> {
     fun add(msg: T)
-    fun clear()
+    fun remove(): T
+    fun isEmpty(): Boolean
 }
 
 class MessageListQueue<T> : MessageQueue<T> {
-    private val list = ArrayList<T>()
+    private val list = ArrayDeque<T>()
     override fun add(msg: T) {
         list.add(msg)
     }
 
-    override fun clear() {
-        list.clear()
+    override fun remove(): T {
+        return list.removeFirst()
     }
 
-    override fun iterator(): Iterator<T> = list.iterator()
+    override fun isEmpty(): Boolean {
+        return list.isEmpty()
+    }
 }
 
 class DefaultQueueFactory<T> : MessageQueueFactory<T> {
