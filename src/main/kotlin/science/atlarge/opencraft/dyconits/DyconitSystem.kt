@@ -38,6 +38,10 @@ class DyconitSystem<SubKey, Message>(
         System.setProperty("kotlinx.coroutines.scheduler", "off")
     }
 
+    fun globalUpdate() {
+        policy.globalUpdate().forEach { it.execute(this) }
+    }
+
     fun update(sub: Subscriber<SubKey, Message>) {
         val commands = policy.update(sub)
         commands.forEach { it.execute(this) }

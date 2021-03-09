@@ -38,3 +38,10 @@ data class DyconitRemoveCommand<SubKey, Message>(val dyconitName: String) : Dyco
         dyconitSystem.removeDyconit(dyconitName)
     }
 }
+
+class DyconitChangePolicyCommand<SubKey, Message>(val dcPolicy: DyconitPolicy<SubKey, Message>) :
+    DyconitCommand<SubKey, Message> {
+    override fun execute(dyconitSystem: DyconitSystem<SubKey, Message>) {
+        dyconitSystem.policy = dcPolicy
+    }
+}

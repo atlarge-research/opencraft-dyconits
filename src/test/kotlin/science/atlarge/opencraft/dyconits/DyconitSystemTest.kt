@@ -1,5 +1,6 @@
 package science.atlarge.opencraft.dyconits
 
+import org.assertj.core.util.Lists
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -42,6 +43,10 @@ internal class DyconitSystemTest {
 
         override fun computeAffectedDyconit(any: Any): String {
             return dyconitName
+        }
+
+        override fun globalUpdate(): List<DyconitCommand<String, String>> {
+            return Lists.emptyList()
         }
 
     }
