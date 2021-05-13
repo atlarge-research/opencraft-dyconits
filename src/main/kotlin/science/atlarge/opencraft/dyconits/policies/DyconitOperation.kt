@@ -45,3 +45,9 @@ class DyconitChangePolicyCommand<SubKey, Message>(val dcPolicy: DyconitPolicy<Su
         dyconitSystem.policy = dcPolicy
     }
 }
+
+class DyconitClearCommand<SubKey, Message>() : DyconitCommand<SubKey, Message> {
+    override fun execute(dyconitSystem: DyconitSystem<SubKey, Message>) {
+        dyconitSystem.clear()
+    }
+}

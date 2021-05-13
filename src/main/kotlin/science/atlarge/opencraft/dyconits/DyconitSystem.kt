@@ -157,9 +157,14 @@ class DyconitSystem<SubKey, Message>(
         return dyconits.size
     }
 
-    private fun clear() {
+    fun clear() {
         // TODO prevent concurrent modifications.
-        dyconits.forEach { (_, v) -> v.close() }
+        dyconits.forEach { (_, v) ->
+            run {
+                v.close()
+                v.synchronize()
+            }
+        }
         dyconits.clear()
         subs.clear()
     }
