@@ -1,6 +1,5 @@
 package science.atlarge.opencraft.dyconits
 
-import kotlinx.coroutines.runBlocking
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.atomic.LongAdder
@@ -15,7 +14,6 @@ class Subscription<Message>(
     var callback: MessageChannel<Message> = callback
         private set
     private var timerSet = false
-    private var stopped = false
     var timestampLastReset: Instant = Instant.now()
         private set
     val staleness: Duration
@@ -61,13 +59,5 @@ class Subscription<Message>(
     fun update(bounds: Bounds = this.bounds, callback: MessageChannel<Message> = this.callback) {
         this.bounds = bounds
         this.callback = callback
-    }
-
-    // FIXME fix close
-    fun close() = runBlocking {
-        // TODO prevent policy resetting bounds
-        bounds = Bounds.ZERO
-//            flush()
-        stopped = true
     }
 }

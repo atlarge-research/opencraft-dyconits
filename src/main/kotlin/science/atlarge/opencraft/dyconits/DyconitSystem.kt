@@ -90,15 +90,25 @@ class DyconitSystem<SubKey, Message>(
         return subs.getOrDefault(subscriber, HashSet())
     }
 
+    /**
+     * Publish the given message. The currently configured policy selects on which dyconit to publish the message,
+     * based on the given publisher.
+     */
     fun publish(publisher: Any, message: Message) {
         val name = policy.computeAffectedDyconit(publisher)
         dyconits[name]?.let { publish(message, it) }
     }
 
+    /**
+     * Publish a message to a dyconit.
+     */
     fun publish(message: Message, dyconit: Dyconit<SubKey, Message>) {
         dyconit.addMessage(DMessage(message, policy.weigh(message)))
     }
 
+    /**
+     * For each dyconit, synchronize state updates to each subscriber whose consistency bounds have been exceeded.
+     */
     fun synchronize(): Error {
         return subs.entries.parallelStream().map {
             var numError = 0
@@ -122,8 +132,10 @@ class DyconitSystem<SubKey, Message>(
         return dyconits.size
     }
 
+    /**
+     * Removes all existing dyconits. Currently queued messages are sent to subscribers before the data is cleared.
+     */
     fun clear() {
-        // TODO prevent concurrent modifications.
         dyconits.forEach { (_, v) ->
             run {
                 v.close()

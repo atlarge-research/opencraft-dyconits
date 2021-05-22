@@ -24,8 +24,10 @@ class Dyconit<SubKey, Message>(
         }
     }
 
+    /**
+     * Removes the given subscriber from this dyconit. Currently queued messages are lost.
+     */
     fun removeSubscription(sub: SubKey) {
-        // TODO this does not flush queued messages. Needed?
         subscriptions.remove(sub)
     }
 
@@ -50,7 +52,6 @@ class Dyconit<SubKey, Message>(
     }
 
     fun close() {
-        // TODO prevent new subscriptions from being added
-        subscriptions.values.parallelStream().forEach { it.close() }
+        subscriptions.values.parallelStream().forEach { it.update(bounds = Bounds.ZERO) }
     }
 }
