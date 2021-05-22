@@ -1,5 +1,9 @@
 package science.atlarge.opencraft.dyconits
 
+import io.mockk.MockKAnnotations
+import io.mockk.every
+import io.mockk.impl.annotations.RelaxedMockK
+import io.mockk.verify
 import org.assertj.core.util.Lists
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -50,10 +54,21 @@ internal class DyconitSystemTest {
         }
 
     }
+
+    @RelaxedMockK
+    lateinit var mockPolicy: DyconitPolicy<String, String>
+
+    @RelaxedMockK
+    lateinit var mockDyconitCommand: DyconitCommand<String, String>
+
+    @RelaxedMockK
+    lateinit var mockCallback: MessageChannel<String>
+
     var system: DyconitSystem<String, String>? = null
 
     @BeforeEach
     fun setUp() {
+        MockKAnnotations.init(this)
         system = DyconitSystem(policy, filter)
     }
 
@@ -130,5 +145,38 @@ internal class DyconitSystemTest {
         val bounds2 = bounds.copy(numerical = bounds.numerical + 1)
         system?.subscribe(subscriberName, callback, bounds2, dyconitName)
         assertEquals(bounds2, system?.getDyconit(dyconitName)?.getSubscription(subscriberName)?.bounds)
+    }
+
+    @Test
+    fun globalUpdate() {
+        every { mockPolicy.globalUpdate() } returns listOf(mockDyconitCommand)
+        system?.policy = mockPolicy
+        system?.globalUpdate()
+        verify { mockDyconitCommand.execute(system!!) }
+    }
+
+    @Test
+    fun unsubScribeAll() {
+        val dc1 = "dc1"
+        val dc2 = "dc2"
+        system?.subscribe(subscriberName, mockCallback, Bounds.ZERO, dc1)
+        system?.subscribe(subscriberName, mockCallback, Bounds.ZERO, dc2)
+        assertEquals(subscriberName, system?.getDyconit(dc1)?.getSubscribers()!![0])
+        assertEquals(subscriberName, system?.getDyconit(dc2)?.getSubscribers()!![0])
+        system?.unsubscribeAll(subscriberName)
+        assertEquals(0, system?.getDyconit(dc1)?.getSubscribers()?.size)
+        assertEquals(0, system?.getDyconit(dc2)?.getSubscribers()?.size)
+    }
+
+    @Test
+    fun getAllDyconits() {
+        system?.subscribe(subscriberName, mockCallback, bounds, dyconitName)
+        assertEquals(1, system?.getDyconits()?.size)
+        system?.getDyconits()?.forEach { dc ->
+            run {
+                assertEquals(subscriberName, dc.getSubscribers()[0])
+                assertEquals(dyconitName, dc.name)
+            }
+        }
     }
 }

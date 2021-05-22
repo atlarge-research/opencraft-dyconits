@@ -1,18 +1,13 @@
 package science.atlarge.opencraft.dyconits
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asCoroutineDispatcher
 import science.atlarge.opencraft.dyconits.policies.DyconitPolicy
 import science.atlarge.opencraft.messaging.Filter
 import java.util.*
-import java.util.concurrent.ExecutorService
-import java.util.function.Supplier
 
 class DyconitSystem<SubKey, Message>(
     policy: DyconitPolicy<SubKey, Message>,
     val filter: Filter<SubKey, Message>,
     private val messageQueueFactory: MessageQueueFactory<Message> = DefaultQueueFactory(),
-    private val executorService: Supplier<ExecutorService>? = null,
 ) {
     var policy = policy
         set(value) {
@@ -37,15 +32,7 @@ class DyconitSystem<SubKey, Message>(
     }
 
     fun getDyconit(name: String): Dyconit<SubKey, Message> {
-        return dyconits.getOrPut(
-            name,
-            {
-                Dyconit(
-                    name,
-                    messageQueueFactory,
-                    executorService?.get()?.asCoroutineDispatcher() ?: Dispatchers.Default
-                )
-            })
+        return dyconits.getOrPut(name, { Dyconit(name, messageQueueFactory) })
     }
 
     fun removeDyconit(name: String): Boolean {

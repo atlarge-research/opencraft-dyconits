@@ -1,8 +1,6 @@
 package science.atlarge.opencraft.dyconits
 
 import com.google.common.collect.Maps
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 
 /**
  * A dyconit is similar to a _Topic_ in a Pub/Sub system,
@@ -14,15 +12,14 @@ import kotlinx.coroutines.Dispatchers
 class Dyconit<SubKey, Message>(
     val name: String,
     private val queueFactory: MessageQueueFactory<Message> = DefaultQueueFactory(),
-    private val dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
 
-    private var subscriptions: MutableMap<SubKey, Subscription<SubKey, Message>> = Maps.newConcurrentMap()
+    private var subscriptions: MutableMap<SubKey, Subscription<Message>> = Maps.newConcurrentMap()
 
     fun addSubscription(sub: SubKey, bounds: Bounds, callback: MessageChannel<Message>) {
         when (val subscription = subscriptions[sub]) {
             null -> subscriptions[sub] =
-                Subscription(sub, bounds, callback, queueFactory.newMessageQueue())
+                Subscription(bounds, callback, queueFactory.newMessageQueue())
             else -> subscription.update(bounds = bounds, callback = callback)
         }
     }
@@ -44,7 +41,7 @@ class Dyconit<SubKey, Message>(
         return subscriptions.keys.toList()
     }
 
-    fun getSubscription(sub: SubKey): Subscription<SubKey, Message>? {
+    fun getSubscription(sub: SubKey): Subscription<Message>? {
         return subscriptions[sub]
     }
 

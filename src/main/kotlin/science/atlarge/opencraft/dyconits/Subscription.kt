@@ -5,8 +5,7 @@ import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.atomic.LongAdder
 
-class Subscription<SubKey, Message>(
-    key: SubKey,
+class Subscription<Message>(
     bounds: Bounds,
     callback: MessageChannel<Message>,
     private val messageQueue: MessageQueue<Message>,
@@ -17,7 +16,7 @@ class Subscription<SubKey, Message>(
         private set
     private var timerSet = false
     private var stopped = false
-    var timestampLastReset = Instant.now()
+    var timestampLastReset: Instant = Instant.now()
         private set
     val staleness: Duration
         get() = Duration.between(timestampLastReset, Instant.now())
