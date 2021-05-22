@@ -116,15 +116,6 @@ internal class DyconitSystemTest {
         assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
-//    @Test
-//    fun testLog() {
-//        system = DyconitSystem(policy, filter, log = true)
-//        Thread.sleep(2000)
-//        assertEquals(true, system != null)
-//        assertEquals(true, File(PerformanceCounterLogger.instance.logFilePath).isFile)
-//        assertEquals(true, File(PerformanceCounterLogger.instance.logFilePath).delete())
-//    }
-
     @Test
     fun setBounds() {
         system?.subscribe(subscriberName, callback, bounds, dyconitName)
