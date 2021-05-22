@@ -3,7 +3,8 @@ package science.atlarge.opencraft.dyconits
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.util.function.Consumer
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 
 class DyconitTest {
@@ -15,8 +16,18 @@ class DyconitTest {
     val boundsOneNumerical = Bounds(Int.MAX_VALUE, 1)
     val boundsZeroTime = Bounds(0, Int.MAX_VALUE)
     val boundsSecondTime = Bounds(1000, Int.MAX_VALUE)
-    val sentMessages = ArrayList<String>()
-    val callback = Consumer<String> { t -> sentMessages.add(t) }
+    val sentMessages = LinkedBlockingQueue<String>()
+    val callback = object : MessageChannel<String> {
+        val messages = ArrayList<String>()
+        override fun send(msg: String) {
+            messages.add(msg)
+        }
+
+        override fun flush() {
+            messages.forEach { sentMessages.put(it) }
+            messages.clear()
+        }
+    }
     val msg = "hello world"
 
     @BeforeEach
@@ -46,14 +57,20 @@ class DyconitTest {
     fun addMessageSend() {
         dyconit.addSubscription(subscriber, boundsZeroNumerical, callback)
         dyconit.addMessage(DMessage(msg, 1))
-        assertEquals(msg, sentMessages[0])
+        Thread.sleep(1000)
+        dyconit.synchronize()
+        callback.flush()
+        assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
     @Test
     fun addMessageNoSend() {
         dyconit.addSubscription(subscriber, boundsOneNumerical, callback)
         dyconit.addMessage(DMessage(msg, 0))
-        assertEquals(0, sentMessages.size)
+        Thread.sleep(1000)
+        dyconit.synchronize()
+        callback.flush()
+        assertEquals(null, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
     @Test
@@ -62,33 +79,48 @@ class DyconitTest {
         dyconit.addMessage(DMessage(msg, 0))
         assertEquals(0, sentMessages.size)
         dyconit.addMessage(DMessage(msg, 2))
-        assertEquals(2, sentMessages.size)
+        Thread.sleep(1000)
+        dyconit.synchronize()
+        callback.flush()
+        assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
+        assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
     @Test
     fun addMessageSendTime() {
         dyconit.addSubscription(subscriber, boundsZeroTime, callback)
         dyconit.addMessage(DMessage(msg, 0))
-        assertEquals(1, sentMessages.size)
-        assertEquals(msg, sentMessages[0])
+        Thread.sleep(1000)
+        dyconit.synchronize()
+        callback.flush()
+        assertEquals(msg, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
     @Test
     fun addMessageNoSendTime() {
         dyconit.addSubscription(subscriber, boundsSecondTime, callback)
         dyconit.addMessage(DMessage(msg, 0))
-        assertEquals(0, sentMessages.size)
+        dyconit.synchronize()
+        callback.flush()
+        assertEquals(null, sentMessages.poll(1, TimeUnit.SECONDS))
     }
 
     @Test
     fun addMessageSendAfterSecond() {
         dyconit.addSubscription(subscriber, boundsSecondTime, callback)
         dyconit.addMessage(DMessage(msg, 0))
+        dyconit.synchronize()
+        callback.flush()
         assertEquals(0, sentMessages.size)
         dyconit.addMessage(DMessage(msg, 0))
+        dyconit.synchronize()
+        callback.flush()
         assertEquals(0, sentMessages.size)
         Thread.sleep(1100)
-        assertEquals(2, sentMessages.size)
+        dyconit.synchronize()
+        callback.flush()
+        assertEquals(msg, sentMessages.poll(10, TimeUnit.MILLISECONDS))
+        assertEquals(msg, sentMessages.poll(10, TimeUnit.MILLISECONDS))
     }
 
     @Test

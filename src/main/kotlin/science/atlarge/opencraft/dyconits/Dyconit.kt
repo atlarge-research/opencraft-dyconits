@@ -1,8 +1,6 @@
 package science.atlarge.opencraft.dyconits
 
 import com.google.common.collect.Maps
-import org.slf4j.LoggerFactory
-import java.util.function.Consumer
 
 /**
  * A dyconit is similar to a _Topic_ in a Pub/Sub system,
@@ -11,37 +9,30 @@ import java.util.function.Consumer
  * Outgoing messages are sent to a dyconit, which lazily forwards them to subscribers (players)
  * while preventing large inconsistency.
  */
-class Dyconit<SubKey, Message>(val name: String) {
+class Dyconit<SubKey, Message>(
+    val name: String,
+    private val queueFactory: MessageQueueFactory<Message> = DefaultQueueFactory(),
+) {
 
-    private var subscriptions: MutableMap<SubKey, Subscription<SubKey, Message>> = Maps.newConcurrentMap()
+    private var subscriptions: MutableMap<SubKey, Subscription<Message>> = Maps.newConcurrentMap()
 
-    private val logger = LoggerFactory.getLogger(javaClass)
-
-    fun addSubscription(sub: SubKey, bounds: Bounds, callback: Consumer<Message>) {
+    fun addSubscription(sub: SubKey, bounds: Bounds, callback: MessageChannel<Message>) {
         when (val subscription = subscriptions[sub]) {
-            null -> subscriptions[sub] = Subscription(sub, bounds, callback)
+            null -> subscriptions[sub] =
+                Subscription(bounds, callback, queueFactory.newMessageQueue())
             else -> subscription.update(bounds = bounds, callback = callback)
         }
-        logger.trace("dyconit $name subscribers ${subscriptions.size}")
     }
 
+    /**
+     * Removes the given subscriber from this dyconit. Currently queued messages are lost.
+     */
     fun removeSubscription(sub: SubKey) {
-        // TODO this does not flush queued messages. Needed?
         subscriptions.remove(sub)
-            ?.let { PerformanceCounterLogger.instance.updateBounds(Bounds.ZERO, previous = it.bounds) }
-        logger.trace("dyconit $name subscribers ${subscriptions.size}")
     }
 
     fun addMessage(message: DMessage<Message>) {
-        subscriptions.entries.parallelStream()
-            .map { it.value }
-            .forEach { it.addMessage(message) }
-        val count = subscriptions.entries.count()
-        val instance = PerformanceCounterLogger.instance
-        val error = count * message.weight
-        instance.messagesQueued.addAndGet(count)
-        instance.numericalErrorQueued.addAndGet(error)
-        subscriptions.values.forEach { instance.addNumericalError(it.sub!!, message.weight) }
+        subscriptions.values.forEach { it.addMessage(message) }
     }
 
     fun countSubscribers(): Int {
@@ -52,12 +43,15 @@ class Dyconit<SubKey, Message>(val name: String) {
         return subscriptions.keys.toList()
     }
 
-    fun getSubscription(sub: SubKey): Subscription<SubKey, Message>? {
+    fun getSubscription(sub: SubKey): Subscription<Message>? {
         return subscriptions[sub]
     }
 
+    fun synchronize() {
+        subscriptions.values.forEach { it.synchronize() }
+    }
+
     fun close() {
-        // TODO prevent new subscriptions from being added
-        subscriptions.values.parallelStream().forEach { it.close() }
+        subscriptions.values.parallelStream().forEach { it.update(bounds = Bounds.ZERO) }
     }
 }

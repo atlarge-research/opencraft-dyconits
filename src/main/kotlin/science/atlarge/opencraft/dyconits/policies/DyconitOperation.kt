@@ -2,7 +2,7 @@ package science.atlarge.opencraft.dyconits.policies
 
 import science.atlarge.opencraft.dyconits.Bounds
 import science.atlarge.opencraft.dyconits.DyconitSystem
-import java.util.function.Consumer
+import science.atlarge.opencraft.dyconits.MessageChannel
 
 interface DyconitCommand<SubKey, Message> {
     fun execute(dyconitSystem: DyconitSystem<SubKey, Message>)
@@ -10,7 +10,7 @@ interface DyconitCommand<SubKey, Message> {
 
 class DyconitSubscribeCommand<SubKey, Message>(
     val subscriber: SubKey,
-    val callback: Consumer<Message>,
+    val callback: MessageChannel<Message>,
     val bounds: Bounds,
     val name: String
 ) :
@@ -36,5 +36,18 @@ class DyconitCreateCommand<SubKey, Message>(val dyconitName: String) : DyconitCo
 data class DyconitRemoveCommand<SubKey, Message>(val dyconitName: String) : DyconitCommand<SubKey, Message> {
     override fun execute(dyconitSystem: DyconitSystem<SubKey, Message>) {
         dyconitSystem.removeDyconit(dyconitName)
+    }
+}
+
+class DyconitChangePolicyCommand<SubKey, Message>(val dcPolicy: DyconitPolicy<SubKey, Message>) :
+    DyconitCommand<SubKey, Message> {
+    override fun execute(dyconitSystem: DyconitSystem<SubKey, Message>) {
+        dyconitSystem.policy = dcPolicy
+    }
+}
+
+class DyconitClearCommand<SubKey, Message>() : DyconitCommand<SubKey, Message> {
+    override fun execute(dyconitSystem: DyconitSystem<SubKey, Message>) {
+        dyconitSystem.clear()
     }
 }

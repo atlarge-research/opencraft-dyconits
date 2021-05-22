@@ -1,16 +1,13 @@
 package science.atlarge.opencraft.dyconits
 
-import org.slf4j.LoggerFactory
 import science.atlarge.opencraft.dyconits.policies.DyconitPolicy
 import science.atlarge.opencraft.messaging.Filter
 import java.util.*
-import java.util.function.Consumer
-import kotlin.concurrent.timer
 
 class DyconitSystem<SubKey, Message>(
     policy: DyconitPolicy<SubKey, Message>,
     val filter: Filter<SubKey, Message>,
-    log: Boolean = false
+    private val messageQueueFactory: MessageQueueFactory<Message> = DefaultQueueFactory(),
 ) {
     var policy = policy
         set(value) {
@@ -19,15 +16,14 @@ class DyconitSystem<SubKey, Message>(
         }
     private val dyconits = HashMap<String, Dyconit<SubKey, Message>>()
     private val subs = HashMap<SubKey, MutableSet<Dyconit<SubKey, Message>>>()
-    private val callbackMap = HashMap<SubKey, Consumer<Message>>()
-    private val perfCounterLogger = PerformanceCounterLogger.instance
-
-    private val logger = LoggerFactory.getLogger(javaClass)
+    private val callbackMap = HashMap<SubKey, MessageChannel<Message>>()
 
     init {
-        if (log) {
-            timer("dyconit-system-timer", true, 0, 1000) { perfCounterLogger.log() }
-        }
+        System.setProperty("kotlinx.coroutines.scheduler", "off")
+    }
+
+    fun globalUpdate() {
+        policy.globalUpdate().forEach { it.execute(this) }
     }
 
     fun update(sub: Subscriber<SubKey, Message>) {
@@ -36,40 +32,37 @@ class DyconitSystem<SubKey, Message>(
     }
 
     fun getDyconit(name: String): Dyconit<SubKey, Message> {
-        if (!dyconits.containsKey(name)) {
-            perfCounterLogger.dyconitsCreated.incrementAndGet()
-        }
-        val dyconit = dyconits.getOrPut(name, { Dyconit(name) })
-        logger.trace("dyconits total ${dyconits.size}")
-        return dyconit
+        return dyconits.getOrPut(name, { Dyconit(name, messageQueueFactory) })
     }
 
     fun removeDyconit(name: String): Boolean {
-        val deleted = dyconits.remove(name) != null
-        logger.trace("dyconits total ${dyconits.size}")
-        deleted.takeIf { it }?.run { perfCounterLogger.dyconitsRemoved.incrementAndGet() }
-        return deleted
+        return dyconits.remove(name) != null
     }
 
     fun removeDyconit(dyconit: Dyconit<SubKey, Message>): Boolean {
         return removeDyconit(dyconit.name)
     }
 
-    fun subscribe(sub: SubKey, callback: Consumer<Message>, bounds: Bounds, name: String) {
+    fun subscribe(sub: SubKey, callback: MessageChannel<Message>, bounds: Bounds, name: String) {
         val filteredCallback = callbackMap.getOrPut(sub, {
-            Consumer<Message> { m: Message ->
-                if (filter.filter(sub, m)) {
-                    callback.accept(m)
+            object : MessageChannel<Message> {
+                override fun send(msg: Message) {
+                    if (filter.filter(sub, msg)) {
+                        callback.send(msg)
+                    }
+                }
+
+                override fun flush() {
+                    callback.flush()
                 }
             }
         })
         subscribe(sub, filteredCallback, bounds, getDyconit(name))
     }
 
-    fun subscribe(sub: SubKey, callback: Consumer<Message>, bounds: Bounds, dyconit: Dyconit<SubKey, Message>) {
+    fun subscribe(sub: SubKey, callback: MessageChannel<Message>, bounds: Bounds, dyconit: Dyconit<SubKey, Message>) {
         dyconit.addSubscription(sub, bounds, callback)
         subs.getOrPut(sub, { HashSet() }).add(dyconit)
-        logger.trace("dyconit ${dyconit.name} subscribers ${dyconit.countSubscribers()}")
     }
 
     fun unsubscribeAll(sub: SubKey) {
@@ -87,7 +80,6 @@ class DyconitSystem<SubKey, Message>(
         dyconit.removeSubscription(sub)
         subs.getOrPut(sub, { HashSet() }).remove(dyconit)
         dyconit.takeIf { it.countSubscribers() <= 0 }?.let { removeDyconit(it) }
-        logger.trace("dyconit ${dyconit.name} subscribers ${dyconit.countSubscribers()}")
     }
 
     fun getDyconits(): Collection<Dyconit<SubKey, Message>> {
@@ -98,22 +90,58 @@ class DyconitSystem<SubKey, Message>(
         return subs.getOrDefault(subscriber, HashSet())
     }
 
+    /**
+     * Publish the given message. The currently configured policy selects on which dyconit to publish the message,
+     * based on the given publisher.
+     */
     fun publish(publisher: Any, message: Message) {
         val name = policy.computeAffectedDyconit(publisher)
         dyconits[name]?.let { publish(message, it) }
     }
 
+    /**
+     * Publish a message to a dyconit.
+     */
     fun publish(message: Message, dyconit: Dyconit<SubKey, Message>) {
         dyconit.addMessage(DMessage(message, policy.weigh(message)))
+    }
+
+    /**
+     * For each dyconit, synchronize state updates to each subscriber whose consistency bounds have been exceeded.
+     */
+    fun synchronize(): Error {
+        return subs.entries.parallelStream().map {
+            var numError = 0
+            var staleness = java.time.Duration.ZERO
+            for (dyconit in it.value) {
+                val subscription = dyconit.getSubscription(it.key) ?: continue
+                val error = subscription.synchronize()
+                if (!error.exceedsBounds) {
+                    numError += error.numerical
+                    if (error.staleness > staleness) {
+                        staleness = error.staleness
+                    }
+                }
+            }
+            callbackMap[it.key]?.flush()
+            Error(staleness, numError, true)
+        }.reduce(Error.ZERO, Error::plus)
     }
 
     fun countDyconits(): Int {
         return dyconits.size
     }
 
-    private fun clear() {
-        // TODO prevent concurrent modifications.
-        dyconits.forEach { (_, v) -> v.close() }
+    /**
+     * Removes all existing dyconits. Currently queued messages are sent to subscribers before the data is cleared.
+     */
+    fun clear() {
+        dyconits.forEach { (_, v) ->
+            run {
+                v.close()
+                v.synchronize()
+            }
+        }
         dyconits.clear()
         subs.clear()
     }
