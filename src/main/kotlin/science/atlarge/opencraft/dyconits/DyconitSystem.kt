@@ -6,7 +6,7 @@ import java.util.*
 
 class DyconitSystem<SubKey, Message>(
     policy: DyconitPolicy<SubKey, Message>,
-    val filter: Filter<SubKey, Message>,
+    val filter: Filter<SubKey, Message> = Filter<SubKey, Message> { _, _ -> true },
     private val messageQueueFactory: MessageQueueFactory<Message> = DefaultQueueFactory(),
 ) {
     var policy = policy
