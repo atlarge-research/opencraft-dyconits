@@ -6,7 +6,7 @@
 
     <groupId>science.atlarge.opencraft</groupId>
     <artifactId>dyconits</artifactId>
-    <version>1.0.7</version>
+    <version>1.0.8</version>
     <packaging>jar</packaging>
 
     <name>science.atlarge.opencraft dyconits</name>
@@ -61,7 +61,7 @@
         <dependency>
             <groupId>science.atlarge.opencraft</groupId>
             <artifactId>messaging-system</artifactId>
-            <version>1.2.1-development-SNAPSHOT</version>
+            <version>1.2.1</version>
         </dependency>
         <!-- Kotlin -->
         <dependency>
